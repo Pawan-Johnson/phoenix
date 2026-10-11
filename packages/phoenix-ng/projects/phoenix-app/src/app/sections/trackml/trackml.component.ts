@@ -1,19 +1,20 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, type OnInit, type OnDestroy } from '@angular/core';
 import { EventDisplayService } from 'phoenix-ui-components';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import {
   PhoenixMenuNode,
-  Configuration,
+  type Configuration,
   TrackmlLoader,
   PresetView,
 } from 'phoenix-event-display';
 
 @Component({
+  standalone: false,
   selector: 'app-trackml',
   templateUrl: './trackml.component.html',
   styleUrls: ['./trackml.component.scss'],
 })
-export class TrackmlComponent implements OnInit {
+export class TrackmlComponent implements OnInit, OnDestroy {
   hitsFile = 'assets/files/TrackML/event000001000-hits.csv';
   particlesFile = 'assets/files/TrackML/event000001000-particles.csv';
   truthFile = 'assets/files/TrackML/event000001000-truth.csv';
@@ -26,14 +27,22 @@ export class TrackmlComponent implements OnInit {
   };
   phoenixMenuRoot: PhoenixMenuNode = new PhoenixMenuNode(
     'Phoenix Menu',
-    'phoenix-menu'
+    'phoenix-menu',
   );
   loaded = false;
+  loadingProgress = 0;
+
+  /** Prevents callbacks on destroyed component */
+  private isDestroyed = false;
 
   constructor(
     private eventDisplay: EventDisplayService,
-    private http: HttpClient
+    private http: HttpClient,
   ) {}
+
+  ngOnDestroy() {
+    this.isDestroyed = true;
+  }
 
   ngOnInit() {
     this.trackMLLoader = new TrackmlLoader();
@@ -41,11 +50,11 @@ export class TrackmlComponent implements OnInit {
     const configuration: Configuration = {
       eventDataLoader: this.trackMLLoader,
       presetViews: [
-        new PresetView('Right View', [0, 0, 6000], 'right-cube'),
-        new PresetView('Center View', [-500, 1000, 0], 'top-cube'),
-        new PresetView('Left View', [0, 0, -6000], 'left-cube'),
+        new PresetView('Right View', [0, 0, 6000], [0, 0, 0], 'right-cube'),
+        new PresetView('Center View', [-500, 1000, 0], [0, 0, 0], 'top-cube'),
+        new PresetView('Left View', [0, 0, -6000], [0, 0, 0], 'left-cube'),
       ],
-      defaultView: [4000, 0, 4000],
+      defaultView: [4000, 0, 4000, 0, 0, 0],
       phoenixMenuRoot: this.phoenixMenuRoot,
     };
 
@@ -55,40 +64,48 @@ export class TrackmlComponent implements OnInit {
       'Long Strip',
       0xe9a23b,
       undefined,
-      true
+      true,
     );
     this.eventDisplay.loadOBJGeometry(
       'assets/geometry/TrackML/pixel_simplified.obj',
       'Pixel',
       0xe2a9e8,
       undefined,
-      true
+      true,
     );
     this.eventDisplay.loadOBJGeometry(
       'assets/geometry/TrackML/strip_short_simplified.obj',
       'Short Strip',
       0x369f95,
       undefined,
-      true
+      true,
     );
     this.eventDisplay.loadOBJGeometry(
       'assets/geometry/TrackML/beampipe_simplified.obj',
       'Beampipe',
       0x7f7f7f,
       undefined,
-      true
+      true,
     );
     this.eventDisplay.loadOBJGeometry(
       'assets/geometry/TrackML/pixel_support_tube_simplified.obj',
       'PST',
       0x7bb3ff,
       undefined,
-      true
+      true,
     );
     this.loadTrackMLData();
 
+    this.eventDisplay.getLoadingManager().addProgressListener((progress) => {
+      if (!this.isDestroyed) {
+        this.loadingProgress = progress;
+      }
+    });
+
     this.eventDisplay.getLoadingManager().addLoadListenerWithCheck(() => {
-      this.loaded = true;
+      if (!this.isDestroyed) {
+        this.loaded = true;
+      }
     });
   }
 

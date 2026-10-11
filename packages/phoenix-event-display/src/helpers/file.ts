@@ -7,15 +7,20 @@
 export const saveFile = (
   data: string,
   fileName: string,
-  contentType: string = 'application/json'
+  contentType: string = 'application/json',
 ) => {
   const blob = new Blob([data], { type: contentType });
   const tempAnchor = document.createElement('a');
   tempAnchor.style.display = 'none';
-  tempAnchor.href = URL.createObjectURL(blob);
+  const objectUrl = URL.createObjectURL(blob);
+  tempAnchor.href = objectUrl;
   tempAnchor.download = fileName;
   tempAnchor.click();
   tempAnchor.remove();
+  // The download is started asynchronously by the click above, so revoking
+  // synchronously here can cancel it. Release the URL on the next tick, once
+  // the browser has taken its own reference to the blob.
+  setTimeout(() => URL.revokeObjectURL(objectUrl));
 };
 
 /**
@@ -25,22 +30,34 @@ export const saveFile = (
  */
 export const loadFile = (
   onFileRead: (data: string) => void,
-  contentType: string = 'application/json'
+  contentType: string = 'application/json',
 ) => {
   // Create a mock input file element and use that to read the file
-  let inputFile = document.createElement('input');
+  const inputFile = document.createElement('input');
+  document.body.appendChild(inputFile);
   inputFile.type = 'file';
   inputFile.accept = contentType;
-  inputFile.onchange = (e: any) => {
+  inputFile.onclick = (e: any) => {
+    e.target.value = '';
+  };
+
+  inputFile.addEventListener('invalid', (e) => {
+    console.log(JSON.stringify(e));
+  });
+
+  const fileSelected = (e: any) => {
     const configFile = e.target?.files[0];
     const reader = new FileReader();
     reader.onload = (e) => {
-      onFileRead?.(e.target.result.toString());
-
+      if (e.target && e.target.result) {
+        onFileRead?.(e.target.result.toString());
+      }
       inputFile.remove();
-      inputFile = null;
     };
     reader.readAsText(configFile);
   };
+
+  inputFile.oninput = fileSelected;
+  // inputFile.onchange = fileSelected;
   inputFile.click();
 };

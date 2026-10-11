@@ -3,7 +3,7 @@
  */
 export class PrettySymbols {
   /** Pretty symbols for object params. */
-  public static readonly symbols: object = {
+  public static readonly symbols: { [key: string]: string[] } = {
     θ: ['theta'],
     ϕ: ['phi'],
     pT: ['pt'],
@@ -15,6 +15,8 @@ export class PrettySymbols {
     Energy: ['energy'],
     ET: ['et'],
     '|p|': ['momentum', 'mom'],
+    DCA: ['dca'],
+    Angle: ['angle'],
   };
 
   /**
@@ -23,7 +25,7 @@ export class PrettySymbols {
    */
   public static getPrettySymbol(param: string) {
     const prettySymbol = Object.keys(PrettySymbols.symbols).find((symbol) =>
-      PrettySymbols.symbols[symbol].includes(param)
+      PrettySymbols.symbols[symbol].includes(param),
     );
 
     return prettySymbol ? prettySymbol : param;
@@ -34,7 +36,9 @@ export class PrettySymbols {
    * @param params Object parameters to be pretty printed.
    * @returns New pretty printed parameterss.
    */
-  public static getPrettyParams(params: { [key: string]: any }): object {
+  public static getPrettyParams(params: { [key: string]: any }): {
+    [key: string]: any;
+  } {
     // Create a copy of the params so we don't overwrite the original object
     const paramsCopy = Object.assign({}, params);
     // Go through all the parameters
@@ -54,7 +58,7 @@ export class PrettySymbols {
 
     // Pretty print the dparams if any
     if (paramsCopy?.dparams) {
-      const prettyDParams: object = {};
+      const prettyDParams: { [key: string]: any } = {};
 
       prettyDParams['θ'] = paramsCopy.dparams[3];
       prettyDParams['ϕ'] = paramsCopy.dparams[2];

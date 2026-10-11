@@ -54,7 +54,6 @@ export class TrackmlLoader extends PhoenixLoader {
     for (let line = 1; line < data.length; line++) {
       values = data[line].split(',');
       this.particleData.push({
-        // tslint:disable-next-line:radix
         particle_id: parseInt(values[0]),
         vertex_pos: [
           parseFloat(values[1]),
@@ -103,13 +102,12 @@ export class TrackmlLoader extends PhoenixLoader {
     const eventData = {
       eventNumber: eventNum,
       runNumber: 0,
-      Hits: undefined,
-      Tracks: undefined,
+      Hits: { Reconstructed: [] as any[] },
+      Tracks: { Particles: [] as any[] },
     };
 
     if (this.hitData) {
-      eventData.Hits = {};
-      eventData.Hits.Reconstructed = [];
+      eventData.Hits.Reconstructed = [] as any[];
       let mod = Math.round(this.hitData.length / 5000);
       if (mod < 1) {
         mod = 1;
@@ -126,11 +124,10 @@ export class TrackmlLoader extends PhoenixLoader {
     }
     console.log(
       'Will show this many hits',
-      eventData.Hits.Reconstructed.length
+      eventData.Hits.Reconstructed.length,
     );
 
     if (this.truthData) {
-      eventData.Tracks = { Particles: [] };
       if (this.particleData) {
         for (let i = 0; i < this.particleData.length; i++) {
           // Add the relevant data from particle, such as first hit position - we'll add the particle_id because we need it later.
@@ -144,12 +141,10 @@ export class TrackmlLoader extends PhoenixLoader {
       }
       let hitId;
       let particleId;
-      // tslint:disable-next-line:radix
       const stepSize = parseInt(String(this.truthData.length / 10));
       for (let i = 1; i < this.truthData.length; i++) {
         // Now add the truth data - i.e. add the truth hits which match a particle to the particle (unsorted for the moment)
         hitId = i;
-        // tslint:disable-next-line:radix
         particleId = parseInt(this.truthData[i][0]);
         for (let j = 0; j < eventData.Tracks.Particles.length; j++) {
           // console.log(event_data.Tracks.Particles[j]);
@@ -163,7 +158,7 @@ export class TrackmlLoader extends PhoenixLoader {
           }
         }
         if (i % stepSize === 0) {
-          document.getElementById('info').innerHTML =
+          document.getElementById('info')!.innerHTML =
             'Processed ' +
             (100 * i) / this.truthData.length +
             '% of event data.';
@@ -179,7 +174,7 @@ export class TrackmlLoader extends PhoenixLoader {
         numParticleStubs++;
       }
     }
-    const events = {};
+    const events: { [key: string]: any } = {};
     events[eventNum] = eventData;
     return eventData;
   }

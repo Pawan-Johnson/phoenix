@@ -1,10 +1,10 @@
 {
   "name": "phoenix-ui-components",
-  "version": "1.5.0",
+  "version": "4.2.3",
   "description": "Reusable Angular components of the Phoenix event display application.",
   "author": "Phoenix contributors (https://github.com/HSF/phoenix/graphs/contributors)",
   "license": "Apache-2.0",
-  "homepage": "http://github.com/HSF/phoenix/tree/master/packages/phoenix-ng/projects/phoenix-ui-components#readme",
+  "homepage": "http://github.com/HSF/phoenix/tree/main/packages/phoenix-ng/projects/phoenix-ui-components#readme",
   "repository": {
     "type": "git",
     "url": "git://github.com/HSF/phoenix.git"
@@ -14,38 +14,47 @@
     "_theming.scss"
   ],
   "scripts": {
-    "prepublishOnly": "ng build phoenix-ui-components --prod && rm -rf ./dist/package.json"
+    "prepublishOnly": "ng build phoenix-ui-components --configuration production && rimraf ./dist/package.json"
   },
   "peerDependencies": {
     "@angular/common": "*",
     "@angular/compiler": "*",
     "@angular/core": "*",
     "@angular/platform-browser-dynamic": "*",
-    "phoenix-event-display": "*"
+    "@angular/router": "*",
+    "phoenix-event-display": "*",
+    "zone.js": "*"
   },
   "dependencies": {
-    "@angular-slider/ngx-slider": "^2.0.3",
-    "@angular/cdk": "^11.2.7",
-    "@angular/material": "^11.2.7",
+    "@angular/animations": "^20.3.28",
+    "@angular/cdk": "^20.2.14",
+    "@angular/forms": "^20.3.28",
+    "@angular/material": "^20.2.14",
+    "@angular/platform-browser": "^20.3.28",
     "css-element-queries": "^1.2.3",
-    "three": "^0.124.0",
-    "tslib": "^2.0.1"
+    "jszip": "^3.10.1",
+    "qrcode": "1.5.4",
+    "recordrtc": "^5.6.2",
+    "rxjs": "^7.8.2",
+    "three": "~0.184.0",
+    "tslib": "^2.8.1"
   },
-  "main": "dist/bundles/phoenix-ui-components.umd.js",
-  "module_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/phoenix-ui-components.js",
-  "module": "dist/fesm2015/phoenix-ui-components.js",
-  "es2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/phoenix-ui-components.js",
-  "es2015": "dist/fesm2015/phoenix-ui-components.js",
-  "esm2015": "dist/esm2015/phoenix-ui-components.js",
-  "fesm2015_ivy_ngcc": "__ivy_ngcc__/dist/fesm2015/phoenix-ui-components.js",
-  "fesm2015": "dist/fesm2015/phoenix-ui-components.js",
-  "typings": "dist/phoenix-ui-components.d.ts",
-  "metadata": "dist/phoenix-ui-components.metadata.json",
+  "devDependencies": {
+    "@types/recordrtc": "^5.6.15",
+    "node-fetch": "^3.3.2",
+    "rimraf": "^6.1.2"
+  },
+  "module": "dist/fesm2022/phoenix-ui-components.mjs",
+  "typings": "dist/index.d.ts",
   "sideEffects": false,
-  "__processed_by_ivy_ngcc__": {
-    "es2015": "10.0.14",
-    "fesm2015": "10.0.14",
-    "module": "10.0.14",
-    "typings": "10.0.14"
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/fesm2022/phoenix-ui-components.mjs",
+      "default": "./dist/fesm2022/phoenix-ui-components.mjs"
+    },
+    "./theming": {
+      "sass": "./_theming.scss"
+    }
   }
 }

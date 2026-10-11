@@ -1,27 +1,62 @@
 {
   "name": "root",
   "private": true,
+  "workspaces": [
+    "packages/*",
+    "packages/phoenix-ng/projects/*"
+  ],
   "scripts": {
-    "start": "lerna run start",
+    "postinstall": "node scripts/generate-version.js && node scripts/patch-jsroot.js && yarn workspace phoenix-event-display prepare && husky",
+    "start": "yarn workspace phoenix-event-display tsc:build && lerna run start",
+    "start:ssl": "yarn workspace phoenix-ng start:ssl",
+    "test:ci": "lerna run test:ci",
     "test:coverage": "lerna run test:coverage",
-    "install:dependencies": "lerna bootstrap --ignore phoenix-ui-components && lerna link",
-    "release": "lerna publish --create-release github",
+    "release:patch": "lerna publish patch --create-release github",
     "release:graduate": "lerna publish --create-release github --conventional-graduate",
     "release:major": "lerna publish major --create-release github",
     "release:minor": "lerna publish minor --create-release github",
     "release:pre": "lerna publish prerelease --conventional-prerelease",
-    "version": "lerna run docs --scope phoenix-event-display && git add .",
-    "deploy:web": "lerna run deploy:web --scope phoenix-ng",
-    "prettier:check": "lerna run prettier:check",
-    "prettier:write": "lerna run prettier:write",
-    "docs:coverage": "lerna run docs:coverage --scope phoenix-event-display"
+    "version": "yarn workspace phoenix-event-display docs && git add .",
+    "deploy:web": "yarn workspace phoenix-ng deploy:web",
+    "lint": "lerna run eslint && lerna run prettier:check",
+    "lint:fix": "lerna run eslint:fix && lerna run prettier:write",
+    "docs:coverage": "yarn workspace phoenix-event-display docs:coverage",
+    "commitlint": "commitlint --edit"
   },
   "devDependencies": {
-    "lerna": "^3.22.1"
+    "@commitlint/cli": "^21.0.2",
+    "@commitlint/config-conventional": "^21.0.2",
+    "@eslint/compat": "^1.4.1",
+    "@eslint/eslintrc": "^3.3.3",
+    "@eslint/js": "^9.39.1",
+    "@types/jest": "~29.5.14",
+    "@types/node": "^24.10.1",
+    "@typescript-eslint/eslint-plugin": "^8.48.1",
+    "@typescript-eslint/parser": "^8.48.1",
+    "eslint": "^9.39.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "husky": "^9.1.7",
+    "jest": "~29.7.0",
+    "jest-environment-jsdom": "~29.7.0",
+    "lerna": "^9.0.7",
+    "lint-staged": "^16.2.7",
+    "prettier": "^3.7.4",
+    "rimraf": "^6.1.2",
+    "ts-jest-mock-import-meta": "^1.2.1",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.8.2"
+  },
+  "resolutions": {
+    "three": "~0.178.0",
+    "tar": "^7.5.19"
+  },
+  "packageManager": "yarn@3.3.1",
+  "peerDependencies": {
+    "ts-jest": "*"
   },
   "dependencies": {
-    "gh-pages": "^3.1.0",
-    "phoenix-event-display": "^1.1.0"
-  },
-  "homepage": "https://joshmcfayden.github.io/phoenix/"
+    "@types/recordrtc": "^5.6.15",
+    "recordrtc": "^5.6.2"
+  }
 }

@@ -6,32 +6,36 @@ import { AppComponent } from './app.component';
 import { HomeComponent } from './home/home.component';
 import { GeometryComponent } from './sections/geometry/geometry.component';
 import { AtlasComponent } from './sections/atlas/atlas.component';
-import { FaserComponent } from './sections/faser/faser.component';
+import { AtlasMasterclassComponent } from './sections/atlas-masterclass/atlas-masterclass.component';
 import { LHCbComponent } from './sections/lhcb/lhcb.component';
+import { VPToggleComponent } from './sections/lhcb/vp-toggle/vp-toggle.component';
+import { FaserComponent } from './sections/faser/faser.component';
 import { CMSComponent } from './sections/cms/cms.component';
 import { TrackmlComponent } from './sections/trackml/trackml.component';
 import { PhoenixUIModule } from 'phoenix-ui-components';
-import { RouterModule, Routes } from '@angular/router';
+import { RouterModule, type Routes } from '@angular/router';
 import { PlaygroundComponent } from './sections/playground/playground.component';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { environment } from '../environments/environment';
 
-let routes: Routes;
-
-if (environment?.singleEvent) {
-  routes = [{ path: '', component: AtlasComponent }];
-} else {
-  routes = [
-    { path: '', component: HomeComponent },
-    { path: 'home', component: HomeComponent },
-    { path: 'geometry', component: GeometryComponent },
-    { path: 'atlas', component: AtlasComponent },
-    { path: 'lhcb', component: LHCbComponent },
-    { path: 'cms', component: CMSComponent },
-    { path: 'trackml', component: TrackmlComponent },
-    { path: 'playground', component: PlaygroundComponent },
-  ];
-}
+// const routes: Routes;
+const singleEvent = environment?.singleEvent;
+// if (singleEvent) {
+//   routes = [{ path: '', component: AtlasComponent }];
+// } else {
+const routes: Routes = [
+  { path: '', component: HomeComponent },
+  { path: 'home', component: HomeComponent },
+  { path: 'geometry', component: GeometryComponent },
+  { path: 'atlas', component: AtlasComponent },
+  { path: 'atlas-masterclass', component: AtlasMasterclassComponent },
+  { path: 'lhcb', component: LHCbComponent },
+  { path: 'faser', component: FaserComponent },
+  { path: 'cms', component: CMSComponent },
+  { path: 'trackml', component: TrackmlComponent },
+  { path: 'playground', component: PlaygroundComponent },
+];
+// }
 
 @NgModule({
   declarations: [
@@ -39,18 +43,18 @@ if (environment?.singleEvent) {
     HomeComponent,
     GeometryComponent,
     AtlasComponent,
-    FaserComponent,
+    AtlasMasterclassComponent,
     LHCbComponent,
+    VPToggleComponent,
     CMSComponent,
+    FaserComponent,
     TrackmlComponent,
     PlaygroundComponent,
   ],
   imports: [
     BrowserModule,
     HttpClientModule,
-    RouterModule.forRoot(routes, {
-      useHash: environment?.singleEvent ? false : true,
-    }),
+    RouterModule.forRoot(routes),
     BrowserAnimationsModule,
     PhoenixUIModule,
   ],

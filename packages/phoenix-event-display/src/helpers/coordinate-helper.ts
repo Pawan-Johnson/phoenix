@@ -1,9 +1,24 @@
-import { Vector3 } from 'three';
+import { Vector3, Quaternion } from 'three';
 
 /**
  * Helper methods for coordinate conversions.
  */
 export class CoordinateHelper {
+  /**
+   * Checks if angles are within range: 0 < theta < PI and -PI < phi < PI.
+   * Theta is the polar angle, which is only defined on [0, PI] - values
+   * outside it have no real pseudorapidity, since thetaToEta computes
+   * -log(tan(theta / 2)).
+   * @param theta polar angle in radians, expected in (0, PI)
+   * @param phi azimuthal angle in radians, expected in (-PI, PI)
+   * @returns true if both angles are within their expected ranges
+   */
+  public static anglesAreSane(theta: number, phi: number): boolean {
+    const tmp1 = -Math.PI < phi && Math.PI > phi;
+    const tmp2 = 0 < theta && Math.PI > theta;
+    return tmp1 && tmp2;
+  }
+
   /**
    * Convert pseudorapidity eta to spherical coordinate theta.
    * See definition here: https://en.wikipedia.org/wiki/Pseudorapidity
@@ -26,7 +41,7 @@ export class CoordinateHelper {
 
   /**
    * Get cartesian from spherical parameters.
-   * This should NOT be necessary - should use native threejs methods such as Vector3.setFromSpherical
+   * Applies the necessary rotations to move from threejs to experimental.
    * @param radius The radius.
    * @param theta Theta angle.
    * @param phi Phi angle.
@@ -34,12 +49,48 @@ export class CoordinateHelper {
   public static sphericalToCartesian(
     radius: number,
     theta: number,
-    phi: number
+    phi: number,
   ): Vector3 {
-    return new Vector3(
-      radius * Math.cos(phi) * Math.sin(theta),
-      radius * Math.sin(phi) * Math.sin(theta),
-      radius * Math.cos(theta)
-    );
+    // Threejs uses theta as azimuthal, so need to reverse.
+    const vector = new Vector3();
+    vector.setFromSphericalCoords(radius, theta, phi);
+    vector.applyQuaternion(CoordinateHelper.atlasQuaternion());
+    return vector;
+  }
+
+  /**
+   * Get cartesian from eta/phi parameters.
+   * Applies the necessary rotations to move from threejs native to experimental.
+   * @param radius The radius.
+   * @param eta Pseudorapidity
+   * @param phi Phi angle.
+   */
+  public static etaPhiToCartesian(
+    radius: number,
+    eta: number,
+    phi: number,
+  ): Vector3 {
+    const vector = new Vector3();
+    // Threejs uses theta as azimuthal, so need to reverse.
+    vector.setFromSphericalCoords(radius, this.etaToTheta(eta), phi);
+    vector.applyQuaternion(CoordinateHelper.atlasQuaternion());
+    return vector;
+  }
+
+  /**
+   * Returns the Quaternion to rotate to ATLAS coords.
+   * Temporary. We will need to make this configurable per experiment.
+   */
+  public static atlasQuaternion(): Quaternion {
+    // With nothing, we have eta=0 on x, and phi=0 on z
+    // Should be eta=0 on y, and phi=0 on x
+    const v1 = new Vector3(0, 1, 0);
+    const v2 = new Vector3(0, 0, 1);
+    const quaternion = new Quaternion();
+    quaternion.setFromUnitVectors(v1, v2); // This puts eta~infinite on z-axis, eta=0 on  but y-positive is phi=PI (and eta=0 on x)
+    const quaternion2 = new Quaternion();
+    quaternion2.setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2.0); // Now have eta = 3.0 on -x, eta =0 on +y, and phi = 0 on +z
+    quaternion.multiply(quaternion2);
+    return quaternion;
   }
 }

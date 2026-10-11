@@ -1,0 +1,28 @@
+<div class="d-flex">
+  <app-menu-toggle
+    tooltip="Zoom out (hold)"
+    icon="zoom-out"
+    [active]="false"
+    (touchstart)="zoomOut($event)"
+    (mousedown)="zoomOut($event.button === 0)"
+    (mouseup)="clearZoom()"
+    (mouseleave)="clearZoom()"
+    (touchend)="clearZoom()"
+    (touchcancel)="clearZoom()"
+    (touchmove)="clearZoom()"
+  >
+  </app-menu-toggle>
+  <app-menu-toggle
+    tooltip="Zoom in (hold)"
+    icon="zoom-in"
+    [active]="false"
+    (touchstart)="zoomIn($event)"
+    (mousedown)="zoomIn($event.button === 0)"
+    (mouseup)="clearZoom()"
+    (mouseleave)="clearZoom()"
+    (touchend)="clearZoom()"
+    (touchcancel)="clearZoom()"
+    (touchmove)="clearZoom()"
+  >
+  </app-menu-toggle>
+</div>

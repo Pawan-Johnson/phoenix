@@ -1,6 +1,7 @@
 import { PhoenixLoader } from './phoenix-loader';
 import { Vector3, QuadraticBezierCurve3 } from 'three';
 import { CMSObjects } from './objects/cms-objects';
+import { ObjectTypeConfig } from './object-type-registry';
 import JSZip from 'jszip';
 
 /**
@@ -20,20 +21,14 @@ export class CMSLoader extends PhoenixLoader {
     this.data = {};
   }
 
-  /**
-   * Loads all the object types and collections of event data.
-   * Overridden from {@link PhoenixLoader}.
-   * @param eventData Event data of a CMS event containing all collections.
-   */
-  protected loadObjectTypes(eventData: any) {
-    super.loadObjectTypes(eventData);
-    if (eventData.MuonChambers) {
-      this.addObjectType(
-        eventData.MuonChambers,
-        CMSObjects.getMuonChamber,
-        'MuonChambers'
-      );
-    }
+  /** Add CMS-specific MuonChambers type to the default configs. */
+  protected getObjectTypeConfigs(): ObjectTypeConfig[] {
+    const configs = super.getObjectTypeConfigs();
+    configs.push({
+      typeName: 'MuonChambers',
+      getObject: CMSObjects.getMuonChamber,
+    });
+    return configs;
   }
 
   /**
@@ -45,61 +40,74 @@ export class CMSLoader extends PhoenixLoader {
   public readIgArchive(
     file: string | File,
     onFileRead: (allEvents: any[]) => void,
-    eventPathName?: string
+    eventPathName?: string,
   ) {
     this.loadingManager.addLoadableItem('ig_archive');
     const igArchive = new JSZip();
-    let eventsDataInIg = [];
-    const readArchive = (res: File | ArrayBuffer) => {
-      igArchive.loadAsync(res).then(() => {
+    const eventsDataInIg: any[] = [];
+
+    const readArchive = async (res: File | ArrayBuffer) => {
+      try {
+        await igArchive.loadAsync(res);
         let allFilesPath = Object.keys(igArchive.files);
-        // If the event path or name is given then filter all data to get the required events
+
+        // Filter all data to get the required events
         if (eventPathName) {
           allFilesPath = allFilesPath.filter((filePath) =>
-            filePath.includes(eventPathName)
+            filePath.includes(eventPathName),
           );
         }
-        let i = 1;
-        for (const filePathInIg of allFilesPath) {
-          // If the files are in the "Events" folder then process them.
+
+        const filePromises = allFilesPath.map(async (filePathInIg) => {
           if (filePathInIg.toLowerCase().startsWith('events')) {
-            igArchive
-              .file(filePathInIg)
-              .async('string')
-              .then((singleEvent: string) => {
-                // The data has some inconsistencies which need to be removed to properly parse JSON
-                singleEvent = singleEvent
-                  .replace(/'/g, '"')
-                  .replace(/\(/g, '[')
-                  .replace(/\)/g, ']')
-                  .replace(/nan/g, '0');
-                const eventJSON = JSON.parse(singleEvent);
-                eventJSON.eventPath = filePathInIg;
-                eventsDataInIg.push(eventJSON);
-                if (i === allFilesPath.length) {
-                  onFileRead(eventsDataInIg);
-                  this.loadingManager.itemLoaded('ig_archive');
-                }
-                i++;
-              });
-          } else {
-            if (i === allFilesPath.length) {
-              onFileRead(eventsDataInIg);
-              this.loadingManager.itemLoaded('ig_archive');
-            }
-            i++;
+            const archiveFile = igArchive.file(filePathInIg);
+            if (!archiveFile) return;
+
+            let singleEvent = await archiveFile.async('string');
+
+            // OPTIMIZATION: Single-pass Regex replaces all inconsistent data at once
+            // instead of iterating the entire giant string 4 separate times.
+            singleEvent = singleEvent.replace(/'|\(|\)|nan/g, (match) => {
+              if (match === "'") return '"';
+              if (match === '(') return '[';
+              if (match === ')') return ']';
+              if (match === 'nan') return '0';
+              return match;
+            });
+
+            const eventJSON = JSON.parse(singleEvent);
+            eventJSON.eventPath = filePathInIg;
+            eventsDataInIg.push(eventJSON);
           }
+        });
+
+        // Ensure all async processing completes before firing the callback
+        await Promise.all(filePromises);
+
+        // Fire callback only when all data is ready
+        if (eventsDataInIg.length > 0) {
+          onFileRead(eventsDataInIg);
         }
-      });
+      } catch (error) {
+        console.error('Error parsing .ig archive:', error);
+      } finally {
+        // FINALLY BLOCK: Guarantees the loading manager resolves whether it succeeds or fails
+        this.loadingManager.itemLoaded('ig_archive');
+      }
     };
 
     if (file instanceof File) {
       readArchive(file);
     } else {
       fetch(file)
-        .then((res) => res.arrayBuffer())
         .then((res) => {
-          readArchive(res);
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          return res.arrayBuffer();
+        })
+        .then((res) => readArchive(res))
+        .catch((error) => {
+          console.error('Error fetching .ig file:', error);
+          this.loadingManager.itemLoaded('ig_archive');
         });
     }
   }
@@ -113,14 +121,14 @@ export class CMSLoader extends PhoenixLoader {
   public loadEventDataFromIg(
     filePath: string,
     eventPathName: string,
-    onEventRead: (eventData: any) => void
+    onEventRead: (eventData: any) => void,
   ) {
     this.readIgArchive(
       filePath,
       (allEvents: any[]) => {
         onEventRead(allEvents[0]);
       },
-      eventPathName
+      eventPathName,
     );
   }
 
@@ -130,8 +138,18 @@ export class CMSLoader extends PhoenixLoader {
    */
   public getEventData(): any {
     const eventInfo = this.data?.['Collections']?.['Event_V2']?.[0];
-
-    let eventData = {
+    const eventData: {
+      runNumber: any;
+      eventNumber: any;
+      ls: any;
+      time: any;
+      Hits: any;
+      Tracks: any;
+      Jets: any;
+      CaloClusters: any;
+      MuonChambers: any;
+      [key: string]: any; // Add index signature
+    } = {
       runNumber: eventInfo?.[0],
       eventNumber: eventInfo?.[1],
       ls: eventInfo?.[2],
@@ -155,7 +173,7 @@ export class CMSLoader extends PhoenixLoader {
     eventData.MuonChambers = this.getMuonChambers();
 
     // Undefining object types if there is no event data
-    for (let objectType of [
+    for (const objectType of [
       'Hits',
       'Tracks',
       'Jets',
@@ -176,7 +194,7 @@ export class CMSLoader extends PhoenixLoader {
    * @returns An object containing event data for all events.
    */
   public getAllEventsData(allEventsDataFromIg: any[]): any {
-    let allEventsData = {};
+    const allEventsData: { [key: string]: any } = {};
     for (const eventData of allEventsDataFromIg) {
       this.data = eventData;
       allEventsData[eventData.eventPath] = this.getEventData();
@@ -191,7 +209,7 @@ export class CMSLoader extends PhoenixLoader {
    */
   private getTrackingClusters(Hits: any): any {
     // These are the collections with point cloud geometries
-    let clusterCollections = [
+    const clusterCollections = [
       'TrackingRecHits_V1',
       'SiStripClusters_V1',
       'SiPixelClusters_V1',
@@ -203,10 +221,10 @@ export class CMSLoader extends PhoenixLoader {
         if (objectParams['pos']) {
           // Increasing the scale to fit Phoenix's event display
           objectParams['pos'] = objectParams['pos'].map(
-            (point: number) => point * this.geometryScale
+            (point: number) => point * this.geometryScale,
           );
         }
-      }
+      },
     );
 
     Object.assign(Hits, newHits);
@@ -219,7 +237,7 @@ export class CMSLoader extends PhoenixLoader {
    * @returns CaloClusters object containing all CaloClusters collections.
    */
   private getCaloClusters(): any {
-    let caloClustersCollections = ['SuperClusters_V1'];
+    const caloClustersCollections = ['SuperClusters_V1'];
     const CaloClusters = this.getObjectCollections(
       caloClustersCollections,
       (objectParams) => {
@@ -227,7 +245,7 @@ export class CMSLoader extends PhoenixLoader {
           // If the attribute of Calo Cluster is energy then scale it to a higher value
           objectParams['energy'] *= this.geometryScale;
         }
-      }
+      },
     );
 
     //! TO BE REVIEWED - Not using extras and assocs - output might be different
@@ -248,9 +266,9 @@ export class CMSLoader extends PhoenixLoader {
     let Jets = {};
 
     // Filtering collections to get all Jets collections
-    const jetsCollections = Object.keys(
-      this.data['Collections']
-    ).filter((key) => key.toLowerCase().includes('jets'));
+    const jetsCollections = Object.keys(this.data['Collections']).filter(
+      (key) => key.toLowerCase().includes('jets'),
+    );
     const cuts = [
       { attribute: 'et', min: 10 },
       { attribute: 'energy', min: 10 },
@@ -266,7 +284,7 @@ export class CMSLoader extends PhoenixLoader {
           }
         }
       },
-      cuts
+      cuts,
     );
 
     return Jets;
@@ -277,7 +295,7 @@ export class CMSLoader extends PhoenixLoader {
    * @returns MuonChambers object containing all Muon Chambers collections.
    */
   private getMuonChambers(): any {
-    let muonChambersCollections = ['MatchingCSCs_V1', 'MuonChambers_V1'];
+    const muonChambersCollections = ['MatchingCSCs_V1', 'MuonChambers_V1'];
     const MuonChambers = this.getObjectCollections(
       muonChambersCollections,
       (muonChamberParams) => {
@@ -291,7 +309,7 @@ export class CMSLoader extends PhoenixLoader {
             ].map((val: number) => val * this.geometryScale);
           }
         }
-      }
+      },
     );
     return MuonChambers;
   }
@@ -306,9 +324,9 @@ export class CMSLoader extends PhoenixLoader {
   private getObjectCollections(
     collections: string[],
     processObject?: (objectParams: any) => void,
-    cuts?: { attribute: string; min?: number; max?: number }[]
+    cuts?: { attribute: string; min?: number; max?: number }[],
   ): any {
-    let ObjectType = {};
+    const ObjectType: { [key: string]: any[] } = {};
 
     // Filter to check if the provided collections are indeed inside the data
     collections = collections.filter((key) => this.data['Collections'][key]);
@@ -319,11 +337,14 @@ export class CMSLoader extends PhoenixLoader {
       const objectAttributes = this.data['Types'][collection];
       // Iterating a single object collection to process all objects
       for (const physicsObject of this.data['Collections'][collection]) {
-        let objectParams = {};
+        const objectParams: { [key: string]: number } = {};
+
         // Filling object params using the given types
-        objectAttributes.forEach((attribute, attributeIndex) => {
-          objectParams[attribute[0]] = physicsObject[attributeIndex];
-        });
+        objectAttributes.forEach(
+          (attribute: (string | number)[], attributeIndex: string | number) => {
+            objectParams[attribute[0]] = physicsObject[attributeIndex];
+          },
+        );
 
         // Applying cuts to object (if any)
         if (cuts) {
@@ -366,7 +387,7 @@ export class CMSLoader extends PhoenixLoader {
    * @returns Tracks object containing all Tracks collections.
    */
   private getTracks(): any {
-    let Tracks = {};
+    const Tracks: { [key: string]: any[] } = {};
 
     // All collections with tracks
     let tracksCollections = [
@@ -443,7 +464,7 @@ export class CMSLoader extends PhoenixLoader {
     ];
     // Filtering to check if data actually exists in collections
     tracksCollections = tracksCollections.filter(
-      (obj) => this.data['Collections'][obj.collection]
+      (obj) => this.data['Collections'][obj.collection],
     );
 
     for (const tracksCollection of tracksCollections) {
@@ -457,16 +478,29 @@ export class CMSLoader extends PhoenixLoader {
       const trackTypes = this.data['Types'][tracksCollection.collection];
 
       // Variables to be used inside the loop
-      let ti, ei, p1, d1, p2, d2, distance, scale, cp1, cp2, curve, trackParams;
+      let ti,
+        ei,
+        p1,
+        d1,
+        p2,
+        d2,
+        distance,
+        scale,
+        cp1,
+        cp2,
+        curve,
+        trackParams: { [x: string]: any; pt?: any; color?: any; pos?: any };
 
       for (let i = 0; i < assocs.length; i++) {
         // Current track info
         trackParams = {};
 
         // Set properties/attributes of track
-        trackTypes.forEach((attribute, attributeIndex) => {
-          trackParams[attribute[0]] = tracks[i][attributeIndex];
-        });
+        trackTypes.forEach(
+          (attribute: (string | number)[], attributeIndex: string | number) => {
+            trackParams[attribute[0]] = tracks[i][attributeIndex];
+          },
+        );
 
         // SKIPPING TRACKS WITH pt < min_pt
         if (trackParams.pt < tracksCollection.min_pt) {
@@ -500,18 +534,18 @@ export class CMSLoader extends PhoenixLoader {
         cp1 = new Vector3(
           p1.x + scale * d1.x,
           p1.y + scale * d1.y,
-          p1.z + scale * d1.z
+          p1.z + scale * d1.z,
         );
         cp2 = new Vector3(
           p2.x + scale * d2.x,
           p2.y + scale * d2.y,
-          p2.z + scale * d2.z
+          p2.z + scale * d2.z,
         );
 
         // Create the track curve
         curve = new QuadraticBezierCurve3(p1, cp1, p2);
 
-        let positions = [];
+        const positions = [];
         // Divide the curve into points to put into positions array
         for (const position of curve.getPoints(24)) {
           // Increasing the scale to fit Phoenix's event display
@@ -536,7 +570,7 @@ export class CMSLoader extends PhoenixLoader {
    * @returns Metadata of the event.
    */
   getEventMetadata(): any[] {
-    let metadata = super.getEventMetadata();
+    const metadata = super.getEventMetadata();
     const eventInfo = this.data?.['Collections']?.['Event_V2']?.[0];
     if (eventInfo?.[3]) {
       metadata.push({

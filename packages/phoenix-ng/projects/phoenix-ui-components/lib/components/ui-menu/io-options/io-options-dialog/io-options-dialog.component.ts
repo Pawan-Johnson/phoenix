@@ -1,0 +1,456 @@
+import { NotificationService } from '../../../../services/notification.service';
+import { type OnInit, Component, Input } from '@angular/core';
+import {
+  CMSLoader,
+  JiveXMLLoader,
+  readZipFile,
+  Edm4hepJsonLoader,
+  PHYSLITELoader,
+  ATLASESDLoader,
+} from 'phoenix-event-display';
+import { EventDisplayService } from '../../../../services/event-display.service';
+import { MatDialogRef } from '@angular/material/dialog';
+import {
+  EventDataFormat,
+  type EventDataImportOption,
+  ImportOption,
+} from '../../../../services/extras/event-data-import';
+
+@Component({
+  standalone: false,
+  selector: 'app-io-options-dialog',
+  templateUrl: './io-options-dialog.component.html',
+  styleUrls: ['./io-options-dialog.component.scss'],
+})
+export class IOOptionsDialogComponent implements OnInit {
+  @Input()
+  eventDataImportOptions: EventDataImportOption[] = [EventDataFormat.JSON];
+
+  eventDataOptionsWithHandler: ImportOption[];
+
+  private supportedEventDataFormats = [
+    new ImportOption(
+      EventDataFormat.JSON,
+      '.json',
+      this.handleJSONEventDataInput.bind(this),
+      'application/json',
+    ),
+    new ImportOption(
+      EventDataFormat.EDM4HEPJSON,
+      '.edm4hep.json',
+      this.handleEDM4HEPJSONEventDataInput.bind(this),
+      'application/json',
+    ),
+    new ImportOption(
+      EventDataFormat.JIVEXML,
+      '.xml',
+      this.handleJiveXMLDataInput.bind(this),
+      'text/xml',
+    ),
+    new ImportOption(
+      EventDataFormat.ZIP,
+      '.zip',
+      this.handleZipEventDataInput.bind(this),
+      '.zip',
+    ),
+    // Both ROOT formats accept '.root', so the button labels have to say which
+    // is which — the template renders "Load {{ fileType }}".
+    new ImportOption(
+      EventDataFormat.PHYSLITE,
+      'PHYSLITE (.root)',
+      this.handlePHYSLITEInput.bind(this),
+      '.root',
+    ),
+    new ImportOption(
+      EventDataFormat.ATLASESD,
+      'ATLAS ESD (.root)',
+      this.handleATLASESDInput.bind(this),
+      '.root',
+    ),
+    new ImportOption(
+      EventDataFormat.IG,
+      '.ig',
+      this.handleIgEventDataInput.bind(this),
+      '.ig',
+    ),
+  ];
+
+  constructor(
+    private eventDisplay: EventDisplayService,
+    public dialogRef: MatDialogRef<IOOptionsDialogComponent>,
+    private notificationService: NotificationService,
+  ) {}
+
+  ngOnInit() {
+    this.eventDataOptionsWithHandler = this.supportedEventDataFormats.filter(
+      (eventDataFormat) =>
+        this.eventDataImportOptions.includes(
+          eventDataFormat.format as EventDataFormat,
+        ),
+    );
+
+    this.eventDataImportOptions.forEach((eventDataImportOption) => {
+      if (eventDataImportOption instanceof ImportOption) {
+        const importHandler = eventDataImportOption.handler.bind(this);
+        eventDataImportOption.handler = (files: FileList) => {
+          importHandler(files);
+          this.onClose();
+        };
+
+        this.eventDataOptionsWithHandler.push(eventDataImportOption);
+      }
+    });
+  }
+
+  getSupportedEventDataFormats() {
+    return this.eventDataImportOptions
+      .map((format) => {
+        if (format instanceof ImportOption) {
+          return format.format;
+        }
+
+        return format;
+      })
+      .filter((format) => format !== 'ZIP')
+      .join(', ');
+  }
+
+  onClose(): void {
+    this.dialogRef.close();
+  }
+
+  handleJSONEventDataInput(files: FileList) {
+    const callback = (content: any) => {
+      try {
+        const json =
+          typeof content === 'string' ? JSON.parse(content) : content;
+        this.eventDisplay.parsePhoenixEvents(json);
+      } catch (error) {
+        this.eventDisplay
+          .getInfoLogger()
+          .add(
+            'Could not parse JSON event file. Please ensure it is valid JSON.',
+            'Error',
+          );
+        this.notificationService.error(
+          'Could not parse JSON event file. Please ensure it is valid JSON.',
+        );
+        console.error('Error parsing JSON event file:', error);
+      }
+    };
+    this.handleFileInput(files[0], 'json', callback);
+  }
+
+  handleEDM4HEPJSONEventDataInput(files: FileList) {
+    const callback = (content: any) => {
+      try {
+        const json =
+          typeof content === 'string' ? JSON.parse(content) : content;
+        const edm4hepJsonLoader = new Edm4hepJsonLoader();
+        edm4hepJsonLoader.setRawEventData(json);
+        edm4hepJsonLoader.processEventData();
+        this.eventDisplay.parsePhoenixEvents(edm4hepJsonLoader.getEventData());
+      } catch (error) {
+        this.eventDisplay
+          .getInfoLogger()
+          .add(
+            'Could not parse EDM4HEP JSON file. Please ensure it is valid JSON.',
+            'Error',
+          );
+        this.notificationService.error(
+          'Could not parse EDM4HEP JSON file. Please ensure it is valid JSON.',
+        );
+        console.error('Error parsing EDM4HEP JSON file:', error);
+      }
+    };
+    this.handleFileInput(files[0], 'edm4hep.json', callback);
+  }
+
+  handleJiveXMLDataInput(files: FileList) {
+    const callback = (content: any) => {
+      const jiveloader = this.getJiveXMLLoader();
+      jiveloader.process(content);
+      const eventData = jiveloader.getEventData();
+      this.eventDisplay.buildEventDataFromJSON(eventData);
+    };
+    this.handleFileInput(files[0], 'xml', callback);
+  }
+
+  private getJiveXMLLoader(): JiveXMLLoader {
+    if (
+      this.eventDisplay?.configuration?.eventDataLoader instanceof JiveXMLLoader
+    ) {
+      return this.eventDisplay.configuration.eventDataLoader as JiveXMLLoader;
+    } else {
+      return new JiveXMLLoader();
+    }
+  }
+
+  handleOBJInput(files: FileList) {
+    const callback = (content: any, name: string) => {
+      this.eventDisplay.parseOBJGeometry(content, name);
+    };
+    this.handleFileInput(files[0], 'obj', callback);
+  }
+
+  handleSceneInput(files: FileList) {
+    const callback = (content: any) => {
+      this.parsePhoenixFile(content);
+    };
+    this.handleFileInput(files[0], 'phnx', callback);
+  }
+
+  handleGLTFInput(files: FileList) {
+    const callback = (file: File) => {
+      this.eventDisplay.parseGLTFGeometry(file);
+    };
+    if (this.isFileOfExtension(files[0].name, 'gltf,glb,gltf.zip,glb.zip')) {
+      callback(files[0]);
+    }
+  }
+
+  handlePhoenixInput(files: FileList) {
+    const callback = (content: any) => {
+      this.parsePhoenixFile(content);
+    };
+    this.handleFileInput(files[0], 'phnx', callback);
+  }
+
+  /**
+   * Load a .phnx file, reporting malformed content instead of failing silently.
+   *
+   * `parsePhoenixDisplay` calls `JSON.parse` on the raw text. It is `async`, so
+   * that failure surfaces as a rejected promise rather than a synchronous
+   * throw, and it runs inside the `FileReader.onload` callback where nothing
+   * awaits it - `onerror` only covers read failures. Both paths are handled
+   * here: `try` for anything thrown before the first await, `catch` on the
+   * promise for the rejection.
+   * @param content Raw text content of the .phnx file.
+   */
+  private parsePhoenixFile(content: any) {
+    const onError = (error: any) => {
+      const message =
+        'Could not parse .phnx file. Please ensure it is valid JSON.';
+      this.eventDisplay.getInfoLogger().add(message, 'Error');
+      this.notificationService.error(message);
+      console.error('Error parsing .phnx file:', error);
+    };
+
+    try {
+      Promise.resolve(this.eventDisplay.parsePhoenixDisplay(content)).catch(
+        onError,
+      );
+    } catch (error) {
+      onError(error);
+    }
+  }
+
+  async handleROOTInput(files: FileList) {
+    const rootObjectName = prompt('Enter object name in ROOT file');
+
+    // The object URL pins the whole file in memory, so release it once the
+    // geometry has been read - ROOT files are routinely hundreds of MB.
+    const objectUrl = URL.createObjectURL(files[0]);
+    try {
+      await this.eventDisplay.loadRootGeometry(
+        objectUrl,
+        rootObjectName,
+        files[0].name.split('.')[0],
+      );
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+
+    this.onClose();
+  }
+
+  async handleRootJSONInput(files: FileList) {
+    if (!this.isFileOfExtension(files[0].name, 'gz')) {
+      return;
+    }
+
+    const name = files[0].name.split('.')[0];
+    const objectUrl = URL.createObjectURL(files[0]);
+    try {
+      await this.eventDisplay.loadRootJSONGeometry(objectUrl, name);
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+
+    this.onClose();
+  }
+
+  async handlePHYSLITEInput(files: FileList) {
+    if (
+      !this.isFileOfExtension(
+        files[0].name,
+        'root,root.1,pool.root,pool.root.1',
+      )
+    ) {
+      return;
+    }
+
+    const loader = new PHYSLITELoader();
+
+    try {
+      const eventsData = await loader.getEventData(files[0] as any);
+      const eventKeys = Object.keys(eventsData);
+      this.eventDisplay.parsePhoenixEvents(eventsData);
+
+      // Find and load the first event with substantial physics data
+      // (the very first event may have no jets/tracks)
+      const richEvent = eventKeys.find((key) => {
+        const evt = eventsData[key];
+        return (
+          (evt['Jets'] &&
+            Object.keys(evt['Jets']).some((c) => evt['Jets'][c].length > 0)) ||
+          (evt['Tracks'] &&
+            Object.keys(evt['Tracks']).some((c) => evt['Tracks'][c].length > 0))
+        );
+      });
+      if (richEvent && richEvent !== eventKeys[0]) {
+        this.eventDisplay.loadEvent(richEvent);
+      }
+    } catch (error) {
+      this.eventDisplay
+        .getInfoLogger()
+        .add('Failed to load PHYSLITE file: ' + error.message, 'Error');
+      this.notificationService.error(
+        'Failed to load PHYSLITE file: ' + error.message,
+      );
+    }
+
+    this.onClose();
+  }
+
+  async handleATLASESDInput(files: FileList) {
+    if (
+      !this.isFileOfExtension(
+        files[0].name,
+        'root,root.1,pool.root,pool.root.1',
+      )
+    ) {
+      return;
+    }
+
+    const loader = new ATLASESDLoader();
+
+    try {
+      const eventsData = await loader.getEventData(files[0] as any);
+      this.eventDisplay.parsePhoenixEvents(eventsData);
+    } catch (error) {
+      this.eventDisplay
+        .getInfoLogger()
+        .add('Failed to load ATLAS ESD file: ' + error.message, 'Error');
+      this.notificationService.error(
+        'Failed to load ATLAS ESD file: ' + error.message,
+      );
+    }
+
+    this.onClose();
+  }
+
+  handleIgEventDataInput(files: FileList) {
+    const cmsLoader = new CMSLoader();
+    cmsLoader.readIgArchive(files[0], (allEvents: any[]) => {
+      const allEventsData = cmsLoader.getAllEventsData(allEvents);
+      this.eventDisplay.parsePhoenixEvents(allEventsData);
+      this.onClose();
+    });
+  }
+
+  async handleZipEventDataInput(files: FileList) {
+    if (!this.isFileOfExtension(files[0].name, 'zip,json.zip')) {
+      return;
+    }
+
+    const allEventsObject = {};
+    let filesWithData: { [fileName: string]: string };
+
+    // Using a try catch block to catch any errors in Promises
+    try {
+      filesWithData = await readZipFile(files[0]);
+    } catch (error) {
+      console.error('Error while reading zip', error);
+      this.eventDisplay.getInfoLogger().add('Could not read zip file', 'Error');
+      this.notificationService.error('Could not read zip file.');
+      return;
+    }
+
+    // JSON event data
+    Object.keys(filesWithData)
+      .filter((fileName) => fileName.endsWith('.json'))
+      .forEach((fileName) => {
+        Object.assign(allEventsObject, JSON.parse(filesWithData[fileName]));
+      });
+
+    // JiveXML event data
+    const jiveloader = this.getJiveXMLLoader();
+
+    Object.keys(filesWithData)
+      .filter((fileName) => {
+        return fileName.endsWith('.xml') || fileName.startsWith('JiveXML');
+      })
+      .forEach((fileName) => {
+        jiveloader.process(filesWithData[fileName]);
+        const eventData = jiveloader.getEventData();
+        Object.assign(allEventsObject, { [fileName]: eventData });
+      });
+    // For some reason the above doesn't pick up JiveXML_XXX_YYY.zip
+
+    this.eventDisplay.parsePhoenixEvents(allEventsObject);
+
+    this.onClose();
+  }
+
+  handleFileInput(
+    file: File,
+    extensions: string,
+    callback: (result: string, fileName?: string) => void,
+  ) {
+    const reader = new FileReader();
+
+    if (this.isFileOfExtension(file.name, extensions)) {
+      reader.onload = () => {
+        callback(reader.result.toString(), file.name.split('.')[0]);
+      };
+      reader.onerror = () => {
+        const errorMessage = `Failed to read file "${file.name}". The file may be corrupted, too large, or inaccessible.`;
+        console.error('FileReader error:', reader.error);
+        this.eventDisplay.getInfoLogger().add(errorMessage, 'Error');
+        this.notificationService.error(errorMessage);
+      };
+      reader.readAsText(file);
+    }
+    this.onClose();
+  }
+
+  private isFileOfExtension(fileName: string, extensions: string): boolean {
+    const extList = extensions.split(',');
+    const lowerName = fileName.toLowerCase();
+    if (extList.some((ext) => lowerName.endsWith('.' + ext.toLowerCase()))) {
+      return true;
+    }
+
+    const accepted = extList.map((e) => '.' + e).join(', ');
+    const msg =
+      'Invalid file format! Possibly the file name "' +
+      fileName +
+      '" does not match the expected FILENAME.EXTENSION, ' +
+      'where extension is one of: ' +
+      accepted;
+    console.error('Error: ' + msg);
+    this.eventDisplay.getInfoLogger().add(msg, 'Error');
+    this.notificationService.error(msg);
+
+    return false;
+  }
+
+  saveScene() {
+    this.eventDisplay.exportPhoenixDisplay();
+  }
+
+  exportOBJ() {
+    this.eventDisplay.exportToOBJ();
+  }
+}

@@ -7,15 +7,12 @@
   * [The Phoenix iconbar](#the-phoenix-iconbar)
     * [Collections info panel](#collections-info-panel)
   * [Keyboard controls](#keyboard-controls)
-  * [VR mode](#vr-mode)
+  * [AR/VR mode](#arvr-mode)
   * [Event display state](#event-display-state)
   * [Labels](#labels)
   * [URL options](#url-options)
 * [Using Phoenix with your own data](#using-phoenix-with-your-own-data)
-  * [Event data](#event-data)
-    * [Format](#format)
-    * [Supported object types](#supported-object-types)
-  * [Geometry](#geometry)
+  * [Geometry Data](#geometry-data)
 
 ## Getting started
 
@@ -84,8 +81,8 @@ At the bottom of the main view you have the Phoenix iconbar (which can be shown/
 From left to right, you can access the following functions:
 
    * **Zoom** : the plus/minus icons allow you to zoom in and out, respectively
-   * **Pre-defined views** : clicking on this will allow you to access some preset views, and to view/hide the axes
-   * **Auto-rotate** : clicking on this will set the camera orbiting the origin
+   * **View options and Tools** : clicking on this will allow you to access some preset views, and to view/hide the axes
+   * **Auto rotate** : clicking on this will set the camera orbiting the origin
    * **Dark/light theme** : switches between dark and light themes
    * **Geometry clipping** : allows you to 'slice' away parts of the geometry in order to view the event data/geometry inside
    * **Orthographic/perspective view** : allows you to switch between different view modes
@@ -93,11 +90,17 @@ From left to right, you can access the following functions:
    * **Object selection** : once enabled, a new window will pop up which will display information about selected objects
    * **Info panel** : shows a window displaying relevant information from Phoenix (for example, about events opened)
    * **Collision animation** : starts a simple animation, simulating a collision and subsequent event data appearing
-   * **Event animation** : starts a simple animation, flying through the detector
+   * **Preset animations** : shows a list of preset animations that can be triggered by clicking on the preset
    * **Collection information** : displays a panel showing textual information about the event data collections (see below)
+   * **Performance mode** : clicking on this will turn on performance mode which makes Phoenix faster but decreases quality
+   * **VR mode** : will make Phoenix enter Virtual Reality (VR) mode
+   * **AR mode** : will make Phoenix enter Augmented Reality (AR) mode
+   * **Screenshot mode** : will enter screenshot mode by hiding all overlays
    * **Import/export** : allows you to load new event data, or detector geometry (depending on configuration)
+   * **Create shareable link** : opens a dialog for creating a shareable link/URL to the experiment
+   * **Browse events** : [optional] if setup on the server, you can browse a specified directory for example events. 
 
-And if you have a AR/VR headset plugged in (or are using it on a smartphone browser which supports this) then you will also see a VR headset icon, which will take you into the Phoenix VR mode (see below)
+The AR and VR mode will only be available if your device (or headset) supports AR or VR.
 
 #### Collections info panel
 
@@ -116,15 +119,18 @@ Phoenix support various keyboard controls:
    * **Shift-C** : enable clipping
    * **Shift-V** : switch between orthographic and perspective
 
-### VR mode
+### AR/VR mode
 
 Phoenix relies on the WebXR functionality of [three.js](https://threejs.org), so before trying it in Phoenix, it would be a good idea to test the VR/AR demos there.
 
-Currently it has been tested on the following devices:
+**VR:** Currently the VR has been tested on the following devices:
 
    * Android smartphones
    * Oculus Quest (make sure you use the Oculus browser - Firefox reality is currently unusably slow)
    * Oculus Rift S (as of writing, the best option seems to be to use google Chrome canary i.e. beta)
+
+**AR:** On Android you will need the latest version of Chrome. On iOS, you will need to use the [WebXR Viewer from Mozilla](https://apps.apple.com/us/app/webxr-viewer/id1295998056) to make AR work.\
+Make sure your device supports AR and is listed here: <https://developers.google.com/ar/devices>
 
 The situation here is rapidly changing, so please let us know if this is out-of-date. Also please note that some features of Phoenix need to be disabled in VR, and it is currently very much a work in progress (help is very much welcomed!).
 
@@ -173,93 +179,20 @@ http://localhost:4200/#/atlas?file=assets/event_data/data.json&type=json
 
 ## Using Phoenix with your own data
 
-The JSON format is pretty simple, but we're still in the process of documenting it (and it might evolve).
+For details on the Phoenix event data format, including all supported object types and their attributes, please see [Phoenix Event Data Format](developers/event_data_format.md)
 
-Caveats aside, here are some rough outlines:
-
-### Event data
-
-#### Format
-
-Currently Phoenix supports loading `.JSON` files containing multiple events. The format is the following.
-
-```js
-{
-  "EVENT_KEY_1": event_object,
-  "EVENT_KEY_2": event_object,
-  ...
-  "EVENT_KEY_N": event_object
-}
-```
-
-`EVENT_KEY` is an identifier for each event, and the format of each `event_object` would be as follows: 
-
-```js
-{
-  "event number": XXX,
-  "run number": YYY,
-  "OBJECT_TYPE_1": {
-    "COLLECTION_NAME_X" : [ OBJECTS ]
-  },
-  "OBJECT_TYPE_2": {
-    "COLLECTION_NAME_Y" : [ OBJECTS ],
-    "COLLECTION_NAME_Z" : [ OBJECTS ]
-  }
-}
-```
-
-Where:
-
-* `event number` and `run number` are hopefully obvious,
-* `OBJECT_TYPE` is one of the supported types that will be mentioned [below](#supported-object-types),
-* `COLLECTION_NAME` is an arbitrary name used to label this particular collection (you can have as many collections of each OBJECT_TYPE as you like).
-
-You can find various examples in the [files folder](../packages/phoenix-ng/projects/phoenix-app/src/assets/files):
-
-* [atlaseventdump2.json](../packages/phoenix-ng/projects/phoenix-app/src/assets/files/event_data/atlaseventdump2.json) is an small multiple event file containing the various objects.
-* [EventData.json](../packages/phoenix-ng/projects/phoenix-app/src/assets/files/event_data/EventData.json) is a bigger file containing more events and objects.
-
-#### Supported object types
-
-Currently Phoenix supports the following physics objects:
-
-* Tracks - the trajectory of a charged particle (usually in a magnetic field)
-* Calorimeter clusters - deposits of energy in a calorimeter
-* Jets - cones of activity within the detector
-* Hits - individual measurements
-
-And coming soon:
-
-* Vertices
-* Compound objects (i.e. 'Muons', which link 'Tracks' and 'Clusters')
-
-(other shapes will be supported soon)
-
-What follows in the list of objects depends on the type:
-
-* 'Tracks' have the following information:
-  * 'chi2' - the chi2 of the fit, i.e. a number
-  * 'dof' - the degrees of freedom of the fit, i.e. a number (not necessarily an integer)
-  * 'params' - the parameters of the tracks, defined as d0,z0, ABC
-  * 'pos' - further positions along the track (a possible extension is to store positions and directions, to permit bezier curves, and perhaps a simple extrapolation system which would further reduce the amount of information needing to be stored)
-  * 'color' - (Optional) Hexadecimal string representing the color to draw the track.
-* 'Clusters' have the following information:
-  * 'phi' - phi direction
-  * 'eta' - eta direction
-* 'Jets' have the following information:
-  * 'coneR' - the radius of the jet cone
-  * 'phi'- phi direction
-  * 'eta' - eta direction
-  * 'energy'
-  
-Uniquely for clusters, you need to define the plane(s) on which to project the clusters as a property of the collection itself, using the following notation
-  
-```json
-  'CYL':[30.2493,243.645,136.947,213.396,3.14159,2850]
-```
-
-### Geometry
-
-![sample geometry](images/phoenix-geometry.png "Geometry in Phoenix")
+### Geometry Data
 
 Phoenix currently supports loading `.obj`, `.gltf`, `.root`, `.json.gz` and `.json` files containing 3D objects.
+
+#### Usage of GLTF files
+
+[GLTF](https://www.khronos.org/registry/glTF/) defines a language to define 3D scenes as well as the corresponding file formats for storing the data (.gltf or .glb file extensions). Phoenix is able to load GLTF files and display them, but it also uses a couple of extensions that will be described in the following lines.
+
+##### Phoenix menu definition in GLTF
+
+GLTF files can have several scenes. Phoenix will display all of them at once, but it will create one menu item per scene so that they can be made visible/invisible independently. The menu item will simply use the name of the scene. If this name contains one or more ' > ' sequence(s) this will be interpreted as the separator between different levels of the menu. Hence scene 'A > B > C' will have name C and be located in submenu B of menu entry A
+
+GLTF scenes can also have extra data attached to them, in a dictionnary called `extras` attached to the scene object. 2 entries of that dictionnary will be interpreted by phoenix :
+* if a`visible` entry exists with boolean value, phoenix will interpret is as the initial visibility of that scene. By default scenes are visible
+* if an `opacity` entry exist with floating point value within [0, 1], phoenix will interpret is as the opacity of that scene. By default opacity is 1

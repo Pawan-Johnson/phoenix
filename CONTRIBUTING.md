@@ -15,19 +15,31 @@ Once you are decided to start contributing on the repository, take a look at the
 
 ### Code formatting
 
-We use [Prettier](http://github.com/prettier/prettier) as a tool for code formatting which you can set up with your editor with [these instructions](https://prettier.io/docs/en/editors.html). We also have scripts to check and update code with Prettier.
+We use [ESLint](http://github.com/eslint/eslint) for linting of TypeScript code and [Prettier](http://github.com/prettier/prettier) for linting of all other files. You can set up ESLint with your editor following [these instructions](https://eslint.org/docs/user-guide/integrations). We also have scripts to check and update code.
 
-To check if the code is formatted:
-
-```sh
-yarn prettier:check
-```
-
-To automatically format the code:
+To check:
 
 ```sh
-yarn prettier:write
+yarn lint
 ```
+
+To update:
+
+```sh
+yarn lint:fix
+```
+
+If you're using Visual Studio Code, you can also add the [prettier plugin](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) and then choose 'Format Document' with this linting tool.
+
+### Running linters against staged git files
+We use [lint-staged](https://github.com/okonet/lint-staged) to make sure we are not committing the usually unwanted linting error on the CI and it helps us to focus on the actual problem if we see a failed CI output. It runs our linters everytime we do a `git commit` and automatically fixes any linting errors it sees inside the project. 
+
+### CI tests
+We make use of continuous integration (CI) tests for each code change. You can (and should!) run this locally on PRs:
+```sh
+yarn test:ci
+```
+Please see the [relevant part](./guides/developers/test-setup.md) of the [Developer guide](./guides/developers#readme) for more information e.g. how to fix common problems.
 
 ## 3. Commit messages
 
@@ -53,14 +65,14 @@ The `body` is encouraged, and should describe in more detail what is being chang
   │       │
   │       └─⫸ Commit Scope: app | event-display
   │
-  └─⫸ Commit Type: feat | fix | docs | style | build
+  └─⫸ Commit Type: feat | fix | docs | style | build | misc | test
 ```
 
 Here is an example of a documentation improvement for the `phoenix-app` package:
 
 ```
 docs(app): Added some text about commit rules
-Lets add some rules for our commit messages, 
+Lets add some rules for our commit messages,
 based on the angular commit conventions.
 ```
 

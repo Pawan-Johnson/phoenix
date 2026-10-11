@@ -1,26 +1,28 @@
 {
   "compileOnSave": false,
   "compilerOptions": {
-    "baseUrl": "./",
     "outDir": "./dist/out-tsc",
     "sourceMap": true,
     "declaration": false,
-    "downlevelIteration": true,
     "experimentalDecorators": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "esModuleInterop": true,
-    "importHelpers": true,
-    "target": "es2015",
-    "module": "es2020",
+    "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "lib": [
-      "es2018",
-      "dom"
-    ],
+    "esModuleInterop": true,
+    "importHelpers": true,
+    "target": "esnext",
+    "module": "esnext",
+    "lib": ["es2018", "dom"],
+    "skipLibCheck": true,
+    "skipDefaultLibCheck": true,
     "paths": {
-      "phoenix-ui-components": ["projects/phoenix-ui-components/src"]
+      "phoenix-ui-components": [
+        "./projects/phoenix-ui-components/lib/public_api.ts"
+      ]
     }
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictDomEventTypes": false
   }
 }

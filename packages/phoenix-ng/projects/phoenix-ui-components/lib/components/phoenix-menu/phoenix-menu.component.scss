@@ -1,0 +1,58 @@
+:host {
+  width: 15rem;
+  max-width: 45%;
+  position: absolute;
+  /* `.item-config > margin-top` in `phoenix-menu-item.component.scss` has to have the same value but negated. */
+  top: 5rem;
+  right: 1rem;
+}
+
+#phoenixMenu {
+  background: var(--phoenix-background-color-secondary);
+  /* Grow to whatever the window allows, leaving room for the `top` offset
+     above and the shortcuts button below, and scroll as a single list once
+     there is more than that. Nested levels must not cap themselves, or the
+     menu ends up as a stack of tiny scroll boxes. */
+  max-height: calc(100vh - 8.5rem);
+  overflow-y: auto;
+  box-shadow: var(--phoenix-box-shadow);
+  z-index: 100;
+
+  /* Custom thin scrollbar to avoid clutter */
+  &::-webkit-scrollbar {
+    width: 4px;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: var(--phoenix-text-color-secondary, #999);
+    border-radius: 4px;
+  }
+
+  @media screen and (max-width: 768px) {
+    top: 4rem;
+  }
+}
+
+.shortcuts-button-wrapper {
+  text-align: right;
+  pointer-events: auto;
+}
+
+.shortcuts-btn {
+  background-color: var(--phoenix-background-color-secondary);
+  color: var(--phoenix-text-color);
+  border: none;
+  padding: 5px 10px;
+  border-radius: 3px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--phoenix-box-shadow);
+  transition: background-color 0.2s ease;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+
+.shortcuts-btn:hover {
+  background-color: var(--phoenix-menu-item-hover-color, #444);
+}

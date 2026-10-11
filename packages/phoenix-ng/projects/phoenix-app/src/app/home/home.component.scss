@@ -1,3 +1,10 @@
+.home-theme-toggle {
+  position: fixed;
+  top: 0.75rem;
+  right: 0.75rem;
+  z-index: 10000;
+}
+
 h1 {
   font-family: 'Circular';
 }
@@ -19,6 +26,7 @@ h1 {
   width: 20em;
   background-color: var(--phoenix-background-color-secondary);
   border-radius: 10px;
+
   p {
     color: var(--phoenix-text-color-secondary);
   }
@@ -37,6 +45,7 @@ h1 {
 
   .card-body {
     justify-content: space-between;
+
     a {
       border-radius: 10px;
     }
@@ -62,5 +71,10 @@ footer {
         color: var(--phoenix-text-color-secondary);
       }
     }
+  }
+
+  .version {
+    font-size: 0.85em;
+    opacity: 0.75;
   }
 }

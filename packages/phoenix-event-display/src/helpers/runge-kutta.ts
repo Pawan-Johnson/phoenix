@@ -18,9 +18,9 @@ export class RungeKutta {
       half_h: number,
       B_middle: Vector3,
       B_last: Vector3,
-      k2: Vector3,
-      k3: Vector3,
-      k4: Vector3;
+      k2: Vector3 = new Vector3(),
+      k3: Vector3 = new Vector3(),
+      k4: Vector3 = new Vector3();
 
     // First Runge-Kutta point (at current position)
     const B_first: Vector3 = Field.get(state.pos);
@@ -84,8 +84,8 @@ export class RungeKutta {
       error_estimate = tryRungeKuttaStep(state.stepSize);
     }
 
-    let fh: number = state.stepSize;
-    let fh2: number = Math.pow(fh, 2);
+    const fh: number = state.stepSize;
+    const fh2: number = Math.pow(fh, 2);
 
     // Update position and momentum
     // state.pos += state.dir * fh + (k1 + k2 + k3) * (fh2 /6)
@@ -94,7 +94,7 @@ export class RungeKutta {
         .clone()
         .add(k2)
         .add(k3)
-        .multiplyScalar(fh2 / 6)
+        .multiplyScalar(fh2 / 6),
     );
     // state.dir += (k1 + k2 * 2 + k3 * 2 + k4) * (fh / 6)
     state.dir.add(
@@ -103,7 +103,7 @@ export class RungeKutta {
         .add(k2.clone().multiplyScalar(2))
         .add(k3.clone().multiplyScalar(2))
         .add(k4)
-        .multiplyScalar(fh / 6)
+        .multiplyScalar(fh / 6),
     );
     state.dir.normalize();
 
@@ -130,21 +130,21 @@ export class RungeKutta {
     q: number,
     mss: number = -1,
     plength: number = 1000,
-    inbounds: (pos: Vector3) => boolean = () => true
+    inbounds: (pos: Vector3) => boolean = () => true,
   ): { pos: Vector3; dir: Vector3 }[] {
-    let rkState: State = new State();
+    const rkState: State = new State();
     rkState.pos = startPos;
     rkState.dir = startDir;
     rkState.p = p;
     rkState.q = q;
     rkState.maxStepSize = mss;
 
-    let result: { pos: Vector3; dir: Vector3 }[] = [];
+    const result: { pos: Vector3; dir: Vector3 }[] = [];
 
     while (rkState.pathLength < plength) {
       rkState.pathLength += RungeKutta.step(rkState);
       // Cloning state to avoid using the reference
-      let copiedState = JSON.parse(JSON.stringify(rkState));
+      const copiedState = JSON.parse(JSON.stringify(rkState));
       result.push({
         pos: copiedState.pos,
         dir: copiedState.dir,

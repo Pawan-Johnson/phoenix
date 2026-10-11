@@ -1,8 +1,9 @@
 import {
   Vector3,
   Object3D,
+  Color,
   CatmullRomCurve3,
-  TubeBufferGeometry,
+  TubeGeometry,
   MeshToonMaterial,
   Mesh,
   BufferGeometry,
@@ -10,87 +11,210 @@ import {
   Line,
   Group,
   Quaternion,
-  CylinderBufferGeometry,
+  CylinderGeometry,
   MeshBasicMaterial,
   BufferAttribute,
   PointsMaterial,
   Points,
-  BoxBufferGeometry,
+  BoxGeometry,
   MeshPhongMaterial,
-  SphereBufferGeometry,
+  SphereGeometry,
   LineSegments,
   LineDashedMaterial,
-  Spherical,
+  CanvasTexture,
+  ShaderMaterial,
+  DoubleSide,
+  InstancedMesh,
+  Matrix4,
 } from 'three';
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
 import { EVENT_DATA_TYPE_COLORS } from '../../helpers/constants';
+import { parseColor } from '../../helpers/color-utils';
 import { RKHelper } from '../../helpers/rk-helper';
 import { CoordinateHelper } from '../../helpers/coordinate-helper';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { TracksMaterial, TracksMesh } from './tracks';
+import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 /**
  * Physics objects that make up an event in Phoenix.
  */
 export class PhoenixObjects {
   /**
-   * Process the Track from the given parameters (and positions)
-   * and get it as a geometry.
+   * Calculates and populates missing track properties (d0, z0, phi, eta, dca, angle) for cuts.
+   */
+  private static calculateTrackParams(track: any) {
+    if (track?.dparams) {
+      if (!track?.phi) {
+        track.phi = track.dparams[2];
+      }
+      if (!track?.eta) {
+        track.eta = CoordinateHelper.thetaToEta(track.dparams[3]);
+      }
+      if (!track?.d0) {
+        track.d0 = track.dparams[0];
+      }
+      if (!track?.z0) {
+        track.z0 = track.dparams[1];
+      }
+    }
+
+    const positions = track.pos;
+    if (positions && positions.length >= 2) {
+      const p0 = positions[0];
+      const p1 = positions[1];
+      const dx = p1[0] - p0[0];
+      const dy = p1[1] - p0[1];
+      const dz = p1[2] - p0[2];
+      const d_xy = Math.sqrt(dx * dx + dy * dy);
+      const v_len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+      if (!track.phi) {
+        track.phi = Math.atan2(dy, dx);
+      }
+      if (!track.eta && v_len > 0) {
+        const theta = Math.acos(dz / v_len);
+        track.eta = CoordinateHelper.thetaToEta(theta);
+      }
+      if (!track.d0) {
+        if (d_xy > 0) {
+          track.d0 = (p0[0] * dy - p0[1] * dx) / d_xy;
+        } else {
+          track.d0 = Math.sqrt(p0[0] * p0[0] + p0[1] * p0[1]);
+        }
+      }
+      if (!track.z0) {
+        if (d_xy > 0) {
+          track.z0 = p0[2] - (dz * (p0[0] * dx + p0[1] * dy)) / (d_xy * d_xy);
+        } else {
+          track.z0 = p0[2];
+        }
+      }
+      if (!track.dca) {
+        track.dca = Math.abs(track.d0);
+      }
+      if (!track.angle) {
+        if (track.dparams && track.dparams[3] !== undefined) {
+          track.angle = track.dparams[3] * (180 / Math.PI);
+        } else if (v_len > 0) {
+          track.angle = Math.acos(dz / v_len) * (180 / Math.PI);
+        }
+      }
+    }
+  }
+
+  /**
+   * Get tracks as three.js obejct.
+   * @param tracks Tracks params to construct tacks from.
+   * @returns The object containing tracks.
+   */
+  public static getTracks(tracks: any): Object3D {
+    const tracksMesh = new TracksMesh();
+    const tracksMaterial = new TracksMaterial({ linewidth: 2 });
+
+    for (const track of tracks) {
+      if (!(track.pos?.length > 2)) {
+        if (track.dparams) {
+          track.pos = RKHelper.extrapolateTrackPositions(track);
+        }
+        track.extended = true;
+      }
+
+      // Filter out positions with NaN from RK extrapolation
+      if (track.pos) {
+        track.pos = track.pos.filter((p: number[]) =>
+          p.every((v: number) => isFinite(v)),
+        );
+      }
+
+      if (!track.pos || track.pos.length < 2) {
+        continue;
+      }
+
+      // For cuts etc we currently need to have the cut parameters on the track
+      PhoenixObjects.calculateTrackParams(track);
+
+      const points = track.pos.map(
+        (p: (number | undefined)[]) => new Vector3(p[0], p[1], p[2]),
+      );
+      const curve = new CatmullRomCurve3(points);
+      const vertices = curve.getPoints(50);
+
+      const color =
+        parseColor(track.color)?.getHex() ??
+        EVENT_DATA_TYPE_COLORS.Tracks.getHex();
+
+      track.tid = tracksMesh.addTrack(vertices, color, track.linewidth);
+      track.material = tracksMaterial;
+    }
+    tracksMesh.process();
+
+    const tracksObject = new Mesh(tracksMesh, tracksMaterial);
+    tracksObject.name = 'Track';
+    for (const track of tracks) {
+      track.uuid = tracksObject.uuid;
+    }
+    return tracksObject;
+  }
+
+  /**
+   * Create and return a Track object from the given parameters
    * @param trackParams Parameters of the Track.
    * @returns Track object.
    */
   public static getTrack(trackParams: any): Object3D {
-    let positions = trackParams.pos;
-    if (!positions) {
-      return;
-    }
-
     // Track with too few points are extrapolated with RungeKutta
-    if (positions.length < 3) {
-      if (trackParams?.dparams) {
-        // Test, for ATLAS.
-        // FIXME - make configurable
-        let inBounds = function (pos: Vector3) {
-          if (pos.z > 3000) return false;
-          if (Math.sqrt(pos.x * pos.x + pos.y * pos.y) > 1100) return false;
-
-          return true;
-        };
-
-        positions = RKHelper.extrapolateTrackPositions(trackParams, inBounds);
+    if (!(trackParams.pos?.length > 2)) {
+      if (trackParams.dparams) {
+        trackParams.pos = RKHelper.extrapolateTrackPositions(trackParams);
       }
+      trackParams.extended = true;
     }
+
+    // Filter out any positions containing NaN from RK extrapolation
+    const positions = trackParams.pos?.filter((p: number[]) =>
+      p.every((v: number) => isFinite(v)),
+    );
+    trackParams.pos = positions;
+    const trackObject = new Group();
 
     // Check again, in case there was an issue with the extrapolation.
-    if (positions.length < 3) {
-      return;
+    if (!positions || positions.length < 2) {
+      return trackObject;
     }
 
     // For cuts etc we currently need to have the cut parameters on the track
-    if (trackParams?.dparams) {
-      if (!trackParams?.phi) {
-        trackParams.phi = trackParams.dparams[2];
-      }
-      if (!trackParams?.eta) {
-        trackParams.eta = CoordinateHelper.thetaToEta(trackParams.dparams[3]);
-      }
-    }
+    PhoenixObjects.calculateTrackParams(trackParams);
 
     // const length = 100;
-    let objectColor = trackParams.color
-      ? parseInt(trackParams.color, 16)
-      : EVENT_DATA_TYPE_COLORS.Tracks.getHex();
+    const objectColor =
+      parseColor(trackParams.color)?.getHex() ??
+      EVENT_DATA_TYPE_COLORS.Tracks.getHex();
 
+    const linewidth = trackParams.linewidth ? trackParams.linewidth : 2;
     const points = [];
 
     for (let i = 0; i < positions.length; i++) {
       points.push(
-        new Vector3(positions[i][0], positions[i][1], positions[i][2])
+        new Vector3(positions[i][0], positions[i][1], positions[i][2]),
       );
+      const radius = Math.sqrt(
+        positions[i][0] * positions[i][0] +
+          positions[i][1] * positions[i][1] +
+          positions[i][2] * positions[i][2],
+      );
+      const thetaFromPos = Math.acos(positions[i][2] / radius);
+      // const deltaTheta = Math.abs(trackParams.dparams[3]-thetaFromPos);
+      // if (deltaTheta>0.1) {
+      //   console.log( 'theta:', trackParams.dparams[3], 'theta from hit', thetaFromPos, 'radius', radius );
+      // }
     }
 
     // attributes
     const curve = new CatmullRomCurve3(points);
 
     // TubeGeometry
-    const geometry = new TubeBufferGeometry(curve, undefined, 2);
+    const geometry = new TubeGeometry(curve, undefined, linewidth);
     const material = new MeshToonMaterial({ color: objectColor });
     const tubeObject = new Mesh(geometry, material);
 
@@ -99,30 +223,29 @@ export class PhoenixObjects {
     const lineGeometry = new BufferGeometry().setFromPoints(vertices);
     const lineMaterial = new LineBasicMaterial({
       color: objectColor,
-      linewidth: 2,
+      linewidth: linewidth,
     });
     const lineObject = new Line(lineGeometry, lineMaterial);
     lineObject.name = 'Track';
 
     // Creating a group to add both the Tube curve and the Line
-    const trackObject = new Group();
     trackObject.add(tubeObject);
     trackObject.add(lineObject);
 
     // Setting info to the tubeObject and trackObject for selection and cuts
-    for (let object of [tubeObject, trackObject]) {
+    for (const object of [tubeObject, trackObject, lineObject]) {
       object.userData = Object.assign({}, trackParams);
       object.name = 'Track';
     }
 
     // Setting uuid for selection from collections info
-    trackParams.uuid = tubeObject.uuid;
+    trackParams.uuid = trackObject.uuid;
 
     return trackObject;
   }
 
   /**
-   * Process the Jet from the given parameters and get it as a geometry.
+   * Create and return a Jet object from the given parameters.
    * @param jetParams Parameters for the Jet.
    * @returns Jet object.
    */
@@ -134,12 +257,15 @@ export class PhoenixObjects {
       ? jetParams.theta
       : CoordinateHelper.etaToTheta(eta);
     // Jet energy parameter can either be 'energy' or 'et'
-    let length = (jetParams.energy ? jetParams.energy : jetParams.et) * 0.2;
-    // Ugh - We don't want the Jets to go out of the event display
-    if (length > 3000) {
-      length = 3000;
-    }
-    const width = length * 0.1;
+    const length = (jetParams.energy ? jetParams.energy : jetParams.et) * 0.2;
+
+    // Add displacement of the origin of the jet
+    // If x is given else jet is at origin
+    const origin_X = jetParams.origin_X ? jetParams.origin_X : 0;
+    // If y is given else jet is at origin
+    const origin_Y = jetParams.origin_Y ? jetParams.origin_Y : 0;
+    // If z is given else jet is at origin
+    const origin_Z = jetParams.origin_Z ? jetParams.origin_Z : 0;
 
     const sphi = Math.sin(phi);
     const cphi = Math.cos(phi);
@@ -147,10 +273,14 @@ export class PhoenixObjects {
     const ctheta = Math.cos(theta);
     //
     const translation = new Vector3(
-      0.5 * length * cphi * stheta,
-      0.5 * length * sphi * stheta,
-      0.5 * length * ctheta
+      0.5 * length * cphi * stheta + origin_X,
+      0.5 * length * sphi * stheta + origin_Y,
+      0.5 * length * ctheta + origin_Z,
     );
+
+    const width = jetParams.coneR
+      ? length * Math.sin(jetParams.coneR)
+      : length * 0.1;
 
     const x = cphi * stheta;
     const y = sphi * stheta;
@@ -160,58 +290,112 @@ export class PhoenixObjects {
     const quaternion = new Quaternion();
     quaternion.setFromUnitVectors(v1, v2);
 
-    const geometry = new CylinderBufferGeometry(
-      width,
-      1,
-      length,
-      50,
-      50,
-      false
-    ); // Cone
+    const geometry = new CylinderGeometry(width, 10, length, 50, 50, false);
 
-    const material = new MeshBasicMaterial({
-      color: jetParams.color ?? EVENT_DATA_TYPE_COLORS.Jets,
-      opacity: 0.3,
+    // Fresnel shader: edges facing away from camera are more opaque,
+    // interior facing camera is transparent. This conveys that jets are
+    // regions of energy deposition (particle showers), not solid objects,
+    // while keeping overlapping jets visually distinguishable.
+    const jetColor = new Color(jetParams.color ?? EVENT_DATA_TYPE_COLORS.Jets);
+    const material = new ShaderMaterial({
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 jetColor;
+        uniform float baseOpacity;
+        uniform float edgeOpacity;
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          float fresnel = 1.0 - abs(dot(normalize(vNormal), normalize(vViewDir)));
+          float alpha = mix(baseOpacity, edgeOpacity, pow(fresnel, 1.5));
+          gl_FragColor = vec4(jetColor, alpha);
+        }
+      `,
+      uniforms: {
+        jetColor: { value: jetColor },
+        baseOpacity: { value: 0.15 },
+        edgeOpacity: { value: 0.7 },
+      },
       transparent: true,
+      depthWrite: false,
+      side: DoubleSide,
     });
-    material.opacity = 0.5;
+
     const mesh = new Mesh(geometry, material);
     mesh.position.copy(translation);
     mesh.quaternion.copy(quaternion);
     mesh.userData = Object.assign({}, jetParams);
     mesh.name = 'Jet';
-    // Setting uuid for selection from collections info
     jetParams.uuid = mesh.uuid;
 
     return mesh;
   }
 
   /**
-   * Process the Hits from the given parameters and get them as a geometry.
-   * @param hitsParams Hit object. Must contain 'pos', the array of [x,y,z] positions,
+   * Create and return a Hits object according to the given parameters.
+   * @param hitsParams Either an array of positions, or of Hit objects. If objects, they must contain 'pos', the array of [x,y,z] positions,
    * Can optionally contain extraInfo, which will be added to the resultant hit.
    * `type` tells Phoenix how to draw this - currently can be Point (default), or Line.
    * @returns Hits object.
    */
-  public static getHits(hitsParams: [{ pos: []; type?: string }]): Object3D {
-    let hitsParamsClone = hitsParams;
+  public static getHits(hitsParams: any): Object3D {
+    let hitsParamsClone: any;
+    let positions: any[];
     let type: string = 'Point'; // Default is point and 3 coordinates per hit
     let coordlength = 3;
-    if (hitsParams.length > 1) {
+    let isSimpleArray = false;
+
+    // if (typeof hitsParams === 'object' && !Array.isArray(hitsParams)) {
+    //   positions = [hitsParams.pos];
+    //   hitsParamsClone = hitsParams;
+    // } else {
+    //   positions = hitsParams;
+    //   hitsParamsClone = { pos: hitsParams };
+    // }
+
+    if (hitsParams.length > 0) {
       // Peek at first one. Would be better to make these properties of the collections.
-      if ('type' in hitsParams[0]) {
-        type = hitsParams[0].type;
-        coordlength = 6;
+      const first = hitsParams[0];
+      if (Array.isArray(first)) {
+        isSimpleArray = true;
+        hitsParamsClone = { pos: hitsParams };
+      } else {
+        hitsParamsClone = hitsParams;
+        if ('type' in first) {
+          type = first.type;
+        }
       }
+    } else {
+      console.log('No hits! Aborting from getHits.');
+      return new Object3D();
     }
+
+    // Lines need 6 coords
+    if (type === 'Line' || type === 'Box') {
+      coordlength = 6;
+    }
+
     // attributes
-    const pointPos = new Float32Array(hitsParams.length * coordlength);
+    const hitLength = hitsParams.length * coordlength;
+    if (isSimpleArray) length = hitLength; // These are already arrays
+    const pointPos = new Float32Array(hitLength);
     let i = 0;
-    let imax = 0;
     for (const hit of hitsParams) {
-      imax = i + coordlength;
       for (let j = 0; j < coordlength; ++j, ++i) {
-        pointPos[i] = hit.pos[j];
+        if (isSimpleArray) {
+          pointPos[i] = hit[j];
+        } else {
+          pointPos[i] = hit.pos[j];
+        }
       }
     }
 
@@ -221,17 +405,29 @@ export class PhoenixObjects {
         return PhoenixObjects.hitsToPoints(
           pointPos,
           hitsParams,
-          hitsParamsClone
+          hitsParamsClone,
+        );
+      case 'CircularPoint':
+        return PhoenixObjects.hitsToCircularPoints(
+          pointPos,
+          hitsParams,
+          hitsParamsClone,
         );
       case 'Line':
         return PhoenixObjects.hitsToLines(
           pointPos,
           hitsParams,
-          hitsParamsClone
+          hitsParamsClone,
+        );
+      case 'Box':
+        return PhoenixObjects.hitsToBoxes(
+          pointPos,
+          hitsParams,
+          hitsParamsClone,
         );
       default:
         console.log('ERROR: Unknown hit type!');
-        return;
+        return new Object3D();
     }
   }
 
@@ -245,7 +441,7 @@ export class PhoenixObjects {
   private static hitsToPoints(
     pointPos: any,
     hitsParams: any,
-    hitParamsClone: any
+    _hitParamsClone: any,
   ): Object3D {
     const geometry = new BufferGeometry();
     geometry.setAttribute('position', new BufferAttribute(pointPos, 3));
@@ -253,12 +449,62 @@ export class PhoenixObjects {
     // material
     const material = new PointsMaterial({
       size: 10,
-      color: hitsParams.color ?? EVENT_DATA_TYPE_COLORS.Hits,
+      color: parseColor(hitsParams[0].color) ?? EVENT_DATA_TYPE_COLORS.Hits,
     });
     // object
     const pointsObj = new Points(geometry, material);
-    pointsObj.userData = Object.assign({}, hitParamsClone);
+    // Disabling for now because the data isn't readable on object selection.
+    // pointsObj.userData = Object.assign({}, hitParamsClone);
+    pointsObj.userData = {};
     pointsObj.name = 'Hit';
+    // Setting uuid for selection from collections info
+    hitsParams.uuid = pointsObj.uuid;
+
+    return pointsObj;
+  }
+
+  /**
+   * Get a Circular Points object from Hits parameters.
+   * @param pointPos Position of the point.
+   * @param hitsParams Parameters of the Hit.
+   * @param hitParamsClone Cloned parameters of the Hit to avoid object references.
+   * @returns A 3D object of type `Points`.
+   */
+  private static hitsToCircularPoints(
+    pointPos: any,
+    hitsParams: any,
+    _hitParamsClone: any,
+  ): Object3D {
+    const geometry = new BufferGeometry();
+    geometry.setAttribute('position', new BufferAttribute(pointPos, 3));
+    geometry.computeBoundingSphere();
+    // material
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 128;
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.clearRect(0, 0, 128, 128);
+      context.fillStyle = 'white';
+      context.beginPath();
+      context.arc(64, 64, 64, 0, 2 * Math.PI);
+      context.fill();
+    }
+    const texture = new CanvasTexture(canvas);
+
+    const material = new PointsMaterial({
+      size: hitsParams[0].size ?? 10,
+      color: hitsParams[0].color ?? EVENT_DATA_TYPE_COLORS.Hits,
+      map: texture,
+      alphaMap: texture,
+      alphaTest: 0.5,
+    });
+    // object
+    const pointsObj = new Points(geometry, material);
+    // Disabling for now because the data isn't readable on object selection.
+    // pointsObj.userData = Object.assign({}, hitParamsClone);
+    pointsObj.userData = {};
+    pointsObj.name = 'CircularHit';
     // Setting uuid for selection from collections info
     hitsParams.uuid = pointsObj.uuid;
 
@@ -275,7 +521,7 @@ export class PhoenixObjects {
   private static hitsToLines(
     pointPos: any,
     hitsParams: any,
-    hitParamsClone: any
+    _hitParamsClone: any,
   ): Object3D {
     // geometry
     const geometry = new BufferGeometry();
@@ -288,8 +534,10 @@ export class PhoenixObjects {
     });
     // object
     const linesObj = new LineSegments(geometry, material);
-    linesObj.userData = Object.assign({}, hitParamsClone);
-    linesObj.name = 'Hit';
+    // Disabling for now because the data isn't readable on object selection.
+    // linesObj.userData = Object.assign({}, hitParamsClone);
+    linesObj.userData = {};
+    linesObj.name = 'LineHit';
     // Setting uuid for selection from collections info
     hitsParams.uuid = linesObj.uuid;
 
@@ -297,45 +545,102 @@ export class PhoenixObjects {
   }
 
   /**
-   * Process the CLuster from the given parameters and get it as a geometry.
-   * @param clusterParams Parameters for the Cluster.
-   * @returns Cluster object.
+   * Get a Mesh object from Hits parameters. The Mesh is actually a set of boxes, one per hit
+   * @param pointPos Positions and dimensions of boxes
+   * @param hitsParams Parameters of the Hit.
+   * @param hitParamsClone Cloned parameters of the Hit to avoid object references.
+   * @returns A 3D object of type `Mesh`.
    */
-  public static getCluster(clusterParams: any): Object3D {
-    const maxR = 1100.0; // This needs to be configurable.
-    const maxZ = 3200.0;
-    const length = clusterParams.energy * 0.03;
+  private static hitsToBoxes(
+    pointPos: any,
+    hitsParams: any,
+    _hitParamsClone: any,
+  ): Object3D {
     // geometry
-    const geometry = new BoxBufferGeometry(30, 30, length);
+    const geometries = [];
+    for (let i = 0; i < pointPos.length; i += 6) {
+      const boxGeometry = new BoxGeometry(
+        pointPos[i + 3],
+        pointPos[i + 4],
+        pointPos[i + 5],
+      );
+      boxGeometry.translate(pointPos[i], pointPos[i + 1], pointPos[i + 2]);
+      geometries.push(boxGeometry);
+    }
+    const geometry = mergeGeometries(geometries);
+    // Dispose intermediate geometries to free GPU memory
+    for (const geom of geometries) {
+      geom.dispose();
+    }
+    geometry.computeBoundingSphere();
     // material
     const material = new MeshPhongMaterial({
-      color: clusterParams.color ?? EVENT_DATA_TYPE_COLORS.CaloClusters,
+      color: parseColor(hitsParams[0].color) ?? EVENT_DATA_TYPE_COLORS.Hits,
     });
     // object
-    const cube = new Mesh(geometry, material);
-    const theta = CoordinateHelper.etaToTheta(clusterParams.eta);
-    clusterParams.theta = theta;
+    const box = new Mesh(geometry, material);
 
-    const pos = new Vector3(
-      4000.0 * Math.cos(clusterParams.phi) * Math.sin(theta),
-      4000.0 * Math.sin(clusterParams.phi) * Math.sin(theta),
-      4000.0 * Math.cos(theta)
+    // Disabling for now because the data isn't readable on object selection.
+    // linesObj.userData = Object.assign({}, hitParamsClone);
+    box.userData = {};
+    box.name = 'BoxHit';
+    // Setting uuid for selection from collections info
+    hitsParams.uuid = box.uuid;
+
+    return box;
+  }
+
+  /**
+   * Create and return a Cluster object from the given parameters.
+   * @param clusterParams Parameters for the Cluster.
+   * @param defaultRadius Default cylindrical radius (rho) where to draw barrel Clusters.
+   * @param defaultZ Default plane in z where to draw endcap Clusters.
+   * @param energyScaling Amount to multiply the energy by to get the depth of the cluster.
+   * @returns Cluster object.
+   */
+  public static getCluster(
+    clusterParams: {
+      energy: number;
+      phi: number;
+      eta: number;
+      radius?: number;
+      z?: number;
+      side?: number;
+      length?: number;
+      color?: string;
+      theta?: number;
+      uuid?: string;
+    },
+    defaultRadius: number = 1800,
+    defaultZ: number = 3600,
+    energyScaling: number = 0.03,
+  ): Object3D {
+    const clusterLength = clusterParams.energy * energyScaling;
+    const clusterWidth = clusterParams.side ?? 40;
+
+    // geometry
+    const cube = PhoenixObjects.getCaloCube(
+      clusterParams,
+      clusterWidth,
+      clusterLength,
+    );
+    const position = PhoenixObjects.getCaloPosition(
+      clusterParams,
+      defaultRadius,
+      defaultZ,
     );
 
-    cube.position.copy(
-      CoordinateHelper.sphericalToCartesian(4000, theta, clusterParams.phi)
-    );
+    cube.position.copy(position);
 
-    // FIXME - more elegant way to do this? Maybe natively use cylindrical here?
-    // How to generalise? Pass in limit lambda?
+    // Skip clusters with NaN positions to avoid THREE.js warnings
     if (
-      cube.position.x * cube.position.x + cube.position.y * cube.position.y >
-      maxR * maxR
+      !isFinite(position.x) ||
+      !isFinite(position.y) ||
+      !isFinite(position.z)
     ) {
-      cube.position.x = maxR * Math.cos(clusterParams.phi);
-      cube.position.y = maxR * Math.sin(clusterParams.phi);
+      return new Group();
     }
-    cube.position.z = Math.max(Math.min(pos.z, maxZ), -maxZ); // keep in maxZ range.
+
     cube.lookAt(new Vector3(0, 0, 0));
     cube.userData = Object.assign({}, clusterParams);
     cube.name = 'Cluster';
@@ -346,23 +651,391 @@ export class PhoenixObjects {
   }
 
   /**
-   * Process the Vertex from the given parameters and get it as a geometry.
+   * Get the position for a Calo hit in cartesian coordinates
+   * @param clusterParams Parameters for the Cluster (which must include theta and phi)
+   * @param defaultRadius Default cylindrical radius (rho) where to draw barrel Clusters. Ignored if clusterParams contains radius.
+   * @param defaultZ Default position along the z axis. Ignored if clusterParams contains z.
+   * @param cylindrical If true, if clusterParams do not contain radius and z, then constrain to a cylinder of radius defaultRadius and length z
+   * @returns Corrected cartesian position.
+   */
+  private static getCaloPosition(
+    clusterParams: {
+      phi: number;
+      eta: number;
+      radius?: number;
+      z?: number;
+      theta?: number;
+    },
+    defaultRadius: number = 1800,
+    defaultZ: number = 3600,
+    cylindrical: boolean = true,
+  ) {
+    const theta =
+      clusterParams.theta ?? CoordinateHelper.etaToTheta(clusterParams.eta);
+
+    // if radius is not part of clusterParams then set it to defaultRadius (if cylindrical is false), or radius+defaultZ otherwise
+    const radius = cylindrical
+      ? (clusterParams.radius ?? defaultRadius + defaultZ)
+      : (clusterParams.radius ?? defaultRadius);
+
+    const position = CoordinateHelper.sphericalToCartesian(
+      radius,
+      theta,
+      clusterParams.phi,
+    );
+
+    if (clusterParams.z) {
+      position.setLength(
+        (position.length() * clusterParams.z) / Math.abs(position.z),
+      );
+    }
+
+    if (!clusterParams.radius && !clusterParams.z) {
+      if (Math.abs(position.z) > defaultZ) {
+        position.setLength(
+          (position.length() * defaultZ) / Math.abs(position.z),
+        );
+      }
+      const cylRadius2 = position.x * position.x + position.y * position.y;
+      const maxR2 = defaultRadius * defaultRadius;
+      if (cylRadius2 > maxR2) {
+        position.setLength(
+          (position.length() * Math.sqrt(maxR2)) / Math.sqrt(cylRadius2),
+        );
+      }
+    }
+
+    return position;
+  }
+
+  /**
+   * Get the cuboid geometry for a Calorimeter hit
+   * @param clusterParams  Parameters for the Cluster (can include color)
+   * @param defaultCellWidth width of the cuboid
+   * @param defaultCellLength length of the cuboid
+   * @returns Geometry.
+   */
+  private static getCaloCube(
+    clusterParams: {
+      length?: number;
+      side?: number;
+      color?: string;
+      opacity?: number;
+    },
+    defaultCellWidth: number = 30,
+    defaultCellLength: number = 30,
+  ) {
+    let cellWidth = clusterParams.side ?? defaultCellWidth;
+    let cellLength = clusterParams.length ?? defaultCellLength;
+
+    // Guard against NaN dimensions
+    if (!isFinite(cellWidth)) cellWidth = defaultCellWidth;
+    if (!isFinite(cellLength)) cellLength = defaultCellLength;
+
+    if (cellLength < cellWidth) {
+      cellLength = cellWidth;
+    }
+
+    const geometry = new BoxGeometry(cellWidth, cellWidth, cellLength);
+
+    // material
+    const material = new MeshPhongMaterial({
+      color: clusterParams.color ?? EVENT_DATA_TYPE_COLORS.CaloClusters,
+      opacity: clusterParams.opacity ?? 1.0,
+      transparent: (clusterParams.opacity ?? 1.0) == 1.0 ? false : true,
+    });
+
+    // object
+    const cube = new Mesh(geometry, material);
+    return cube;
+  }
+
+  /**
+   * Create and return a Calorimeter cell object from the given parameters.
+   * @param caloCells Parameters for the CaloCell.
+   * @returns Calorimeter Cell object.
+   */
+  public static getCaloCell(caloCellParams: {
+    energy: number;
+    phi: number;
+    eta: number;
+    radius?: number;
+    z?: number;
+    theta?: number;
+    color?: string;
+    opacity?: number;
+    side?: number;
+    length?: number;
+    uuid: string;
+  }): Object3D {
+    const defaultRadius = 1700;
+    const defaultZ = 2000;
+    const defaultSide = 30;
+    const defaultLength = 30;
+
+    // geometry
+    const cube = PhoenixObjects.getCaloCube(
+      caloCellParams,
+      defaultSide,
+      defaultLength,
+    );
+    const position = PhoenixObjects.getCaloPosition(
+      caloCellParams,
+      defaultRadius,
+      defaultZ,
+    );
+    cube.position.copy(position);
+
+    // Skip cells with NaN positions to avoid THREE.js warnings
+    if (
+      !isFinite(position.x) ||
+      !isFinite(position.y) ||
+      !isFinite(position.z)
+    ) {
+      return new Group();
+    }
+
+    if (!caloCellParams.radius && !caloCellParams.z) {
+      cube.lookAt(new Vector3(0, 0, 0));
+    } else if (caloCellParams.z && !caloCellParams.radius) {
+      cube.lookAt(new Vector3(position.x, position.y, 0));
+    }
+    if (caloCellParams.radius) {
+      cube.lookAt(new Vector3(0, 0, position.z));
+    }
+
+    cube.userData = Object.assign({}, caloCellParams);
+    cube.name = 'Cluster';
+    // Setting uuid for selection from collections info
+    caloCellParams.uuid = cube.uuid;
+
+    return cube;
+  }
+
+  /**
+   * Create all CaloCells as a single InstancedMesh for performance.
+   * Receives the entire collection array and returns one object with
+   * per-instance transforms and colors, reducing 187K draw calls to 1.
+   * @param cellsParams Array of all cell parameters in the collection.
+   * @returns InstancedMesh containing all cells.
+   */
+  public static getCaloCellsInstanced(cellsParams: any[]): Object3D {
+    const defaultRadius = 1700;
+    const defaultZ = 2000;
+    const defaultSide = 30;
+    const defaultLength = 30;
+
+    const count = cellsParams.length;
+    const unitBox = new BoxGeometry(1, 1, 1);
+    const material = new MeshPhongMaterial({
+      color: cellsParams[0]?.color ?? EVENT_DATA_TYPE_COLORS.CaloClusters,
+      transparent: true,
+      opacity: 0.7,
+    });
+
+    const mesh = new InstancedMesh(unitBox, material, count);
+
+    // Reusable temporaries to avoid per-iteration allocation
+    const tempMatrix = new Matrix4();
+    const tempPosition = new Vector3();
+    const tempScale = new Vector3();
+    const tempColor = new Color();
+    const tempObj = new Object3D();
+
+    for (let i = 0; i < count; i++) {
+      const cell = cellsParams[i];
+
+      // Position (reuse existing helper)
+      const position = PhoenixObjects.getCaloPosition(
+        cell,
+        defaultRadius,
+        defaultZ,
+      );
+
+      // Cell dimensions — scale encodes variable width/length
+      const cellWidth = cell.side ?? defaultSide;
+      let cellLength = cell.length ?? defaultLength;
+      if (cellLength < cellWidth) {
+        cellLength = cellWidth;
+      }
+
+      // Orientation via lookAt (same 3-branch logic as getCaloCell)
+      tempObj.position.copy(position);
+      tempObj.rotation.set(0, 0, 0);
+      tempObj.updateMatrix();
+      if (!cell.radius && !cell.z) {
+        tempObj.lookAt(0, 0, 0);
+      } else if (cell.z && !cell.radius) {
+        tempObj.lookAt(position.x, position.y, 0);
+      }
+      if (cell.radius) {
+        tempObj.lookAt(0, 0, position.z);
+      }
+
+      // Compose transform: position + orientation + scale
+      tempScale.set(cellWidth, cellWidth, cellLength);
+      tempMatrix.compose(position, tempObj.quaternion, tempScale);
+      mesh.setMatrixAt(i, tempMatrix);
+
+      // Per-instance color
+      tempColor.set(cell.color ?? EVENT_DATA_TYPE_COLORS.CaloClusters);
+      mesh.setColorAt(i, tempColor);
+
+      // Write back identifiers for filtering and collection lookups
+      cell._instanceId = i;
+      cell.uuid = mesh.uuid;
+    }
+
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) {
+      mesh.instanceColor.needsUpdate = true;
+    }
+
+    // Compute bounding sphere across all instances for correct frustum culling.
+    // Without this, Three.js uses the unit-box bounding sphere and cells
+    // disappear when panning.
+    mesh.computeBoundingSphere();
+
+    mesh.name = 'CaloCell';
+    mesh.userData = {
+      _isInstancedCaloCells: true,
+      _instanceData: cellsParams,
+      _originalMatrices: null, // lazily populated on first filter
+      _scaleValue: 1, // current scale factor (for filter↔scale coordination)
+      _scaleAxis: null as string | null,
+    };
+
+    return mesh;
+  }
+
+  /**
+   * Get the planar calo cells from parameters.
+   * @param caloCells Parameters to build planar calo cells.
+   * @returns Geometry.
+   */
+  public static getPlanarCaloCells(caloCells: any[]): Object3D {
+    const geoms = [];
+    for (const caloCell of caloCells) {
+      const position = caloCell.pos;
+      if (!position) {
+        continue;
+      }
+
+      const length = caloCell.energy * 0.22;
+      const size = caloCell.cellSize;
+      const plane = caloCell.plane;
+
+      // geometry
+      const geometry = new BoxGeometry(size, size, length);
+      geometry.translate(position[0], position[1], plane[3] + length / 2);
+      const qrot = new Quaternion();
+      qrot.setFromUnitVectors(
+        new Vector3(0, 0, 1),
+        new Vector3(...plane.slice(0, 3)),
+      );
+      geometry.applyQuaternion(qrot);
+      geoms.push(geometry);
+    }
+
+    const material = new MeshPhongMaterial({
+      color: caloCells[0].color ?? EVENT_DATA_TYPE_COLORS.PlanarCaloCells,
+    });
+
+    const mergedGeometry = BufferGeometryUtils.mergeGeometries(geoms);
+    // Dispose intermediate geometries to free GPU memory
+    for (const geom of geoms) {
+      geom.dispose();
+    }
+
+    const outerBox = new Mesh(mergedGeometry, material);
+
+    outerBox.userData = Object.assign({}, caloCells[0]);
+    outerBox.name = 'PlanarCaloCell';
+    for (const caloCell of caloCells) {
+      caloCell.uuid = outerBox.uuid;
+    }
+    return outerBox;
+  }
+
+  /**
+   * Create and return a PlanarCaloCell object from the given parameters.
+   * @param caloCells Parameters for the Planar Calorimeter.
+   * @returns Planar Calorimeter object.
+   */
+  public static getPlanarCaloCell(caloCells: any): Object3D {
+    const position = caloCells.pos;
+    if (!position) {
+      return new Object3D();
+    }
+
+    const length = caloCells.energy * 0.22;
+    const size = caloCells.cellSize;
+    const plane = caloCells.plane;
+
+    // geometry
+    const geometry = new BoxGeometry(size, size, length);
+
+    // there is a need of an outer box to place the proper one inside of it
+    const outerBox = new Object3D();
+
+    // material
+    const material = new MeshPhongMaterial({
+      color: caloCells.color ?? EVENT_DATA_TYPE_COLORS.PlanarCaloCells,
+    });
+
+    // object
+    const box = new Mesh(geometry, material);
+
+    // adding the original box to the outter created one, for proper translation / rotation purposes
+    outerBox.add(box);
+
+    // creating the box in the z direction, and moving it by d, along the z
+    const boxPosition = new Vector3(
+      ...position.slice(0, 2),
+      plane[3] + length / 2,
+    );
+
+    box.position.copy(boxPosition);
+
+    // transforming the box from the z axis to the x,y,z of the plane
+    const qrot = new Quaternion();
+    qrot.setFromUnitVectors(
+      new Vector3(0, 0, 1),
+      new Vector3(...plane.slice(0, 3)),
+    );
+
+    outerBox.quaternion.copy(qrot);
+
+    outerBox.userData = Object.assign({}, caloCells);
+    outerBox.name = 'PlanarCaloCell';
+    caloCells.uuid = outerBox.uuid;
+
+    return outerBox;
+  }
+
+  /**
+   * Create and return a Vertex object from the given parameters.
    * @param vertexParams Parameters for the Vertex.
    * @returns Vertex object.
    */
   public static getVertex(vertexParams: any): Object3D {
     // geometry
-    const geometry = new SphereBufferGeometry(3);
+    const geometry = new SphereGeometry(vertexParams.size ?? 3);
     // material
     const material = new MeshPhongMaterial({
       color: vertexParams.color ?? EVENT_DATA_TYPE_COLORS.Vertices,
     });
     // object
     const sphere = new Mesh(geometry, material);
-    sphere.position.x = vertexParams.x;
-    sphere.position.y = vertexParams.y;
-    sphere.position.z = vertexParams.y;
-
+    if ('pos' in vertexParams) {
+      sphere.position.x = vertexParams.pos[0];
+      sphere.position.y = vertexParams.pos[1];
+      sphere.position.z = vertexParams.pos[2];
+    } else {
+      sphere.position.x = vertexParams.x;
+      sphere.position.y = vertexParams.y;
+      sphere.position.z = vertexParams.z;
+    }
     sphere.userData = Object.assign({}, vertexParams);
     sphere.name = 'Vertex';
     // Setting uuid for selection from collections info
@@ -372,7 +1045,7 @@ export class PhoenixObjects {
   }
 
   /**
-   * Process the Vertex from the given parameters and get it as a geometry.
+   * Create and return a MET object from the given parameters.
    * @param metParams Parameters for the Vertex.
    * @returns MET object.
    */
@@ -399,5 +1072,57 @@ export class PhoenixObjects {
     metParams.uuid = object.uuid;
 
     return object;
+  }
+
+  /**
+   * Type for drawing irregular calorimeter cell comprising 8 xyz vertices in arbitrary geometry.
+   * @param irrCells Properties of irregular calo cell.
+   * @param irrCells.layer Calorimeter layer
+   * @param irrCells.vtx Flattened list of 8 vertex coordinates (24 floats)
+   * @param irrCells.color [R,G,B] integer list
+   * @param irrCells.opacity value from 0 to 1
+   * @returns the cell
+   */
+  public static getIrregularCaloCell(irrCells: {
+    type: any;
+    layer: number;
+    vtx: any;
+    color: string;
+    opacity: any;
+    uuid: any;
+  }): Object3D {
+    const verticesOfCube = [];
+    for (let i = 0; i < 24; i += 3) {
+      verticesOfCube.push(
+        new Vector3(irrCells.vtx[i], irrCells.vtx[i + 1], irrCells.vtx[i + 2]),
+      );
+    }
+    const geometry = new ConvexGeometry(verticesOfCube);
+    const cell_color = new Color(
+      'rgb(' +
+        irrCells.color[0].toString() +
+        ',' +
+        irrCells.color[1].toString() +
+        ',' +
+        irrCells.color[2].toString() +
+        ')',
+    );
+
+    // material
+    const material = new MeshPhongMaterial({
+      color: cell_color,
+      transparent: true,
+      opacity: irrCells.opacity,
+    });
+
+    // object
+    const cell = new Mesh(geometry, material);
+    cell.userData = Object.assign({}, irrCells);
+    cell.name = 'IrregularCaloCell';
+
+    // Setting uuid for selection from collections info
+    irrCells.uuid = cell.uuid;
+
+    return cell;
   }
 }

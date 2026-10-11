@@ -1,0 +1,205 @@
+import {
+  Component,
+  ElementRef,
+  Input,
+  type OnInit,
+  type OnDestroy,
+} from '@angular/core';
+import {
+  ActiveVariable,
+  PrettySymbols,
+  SceneManager,
+} from 'phoenix-event-display';
+import { EventDisplayService } from '../../../../services/event-display.service';
+
+@Component({
+  standalone: false,
+  selector: 'app-collections-info-overlay',
+  templateUrl: './collections-info-overlay.component.html',
+  styleUrls: ['./collections-info-overlay.component.scss'],
+})
+export class CollectionsInfoOverlayComponent implements OnInit, OnDestroy {
+  @Input() showObjectsInfo: boolean;
+  /** Columns to exclude from the collection info table. */
+  @Input() excludedColumns: string[] = [
+    'uuid',
+    'hits',
+    'isCut',
+    'labelText',
+    '_instanceId',
+    '_position',
+    'index',
+  ];
+  hideInvisible: boolean;
+  collections: { type: string; collections: string[] }[];
+  selectedCollection: string;
+  showingCollection: any;
+  collectionColumns: string[];
+  getPrettySymbol = PrettySymbols.getPrettySymbol;
+  activeObject: ActiveVariable<string>;
+  private unsubscribes: (() => void)[] = [];
+
+  constructor(
+    private elementRef: ElementRef,
+    private eventDisplay: EventDisplayService,
+  ) {}
+
+  ngOnInit() {
+    const updateCollections = () => {
+      const collectionsGrouped: { [key: string]: string[] } =
+        this.eventDisplay.getCollections();
+      if (collectionsGrouped) {
+        this.collections = Object.entries(collectionsGrouped).map(
+          ([type, collections]: [string, string[]]) => ({
+            type,
+            collections,
+          }),
+        );
+      }
+    };
+
+    updateCollections();
+
+    this.unsubscribes.push(
+      this.eventDisplay.listenToDisplayedEventChange(() => updateCollections()),
+    );
+
+    this.activeObject = this.eventDisplay.getActiveObjectId();
+    this.unsubscribes.push(
+      this.activeObject.onUpdate((value: string) => {
+        if (document.getElementById(value)) {
+          document.getElementById(value).scrollIntoView(false);
+        }
+      }),
+    );
+  }
+
+  ngOnDestroy() {
+    this.unsubscribes.forEach((unsubscribe) => unsubscribe?.());
+  }
+
+  changeCollection(selectedCollection: string) {
+    const eventDataGroup = this.getEventDataGroup();
+    this.selectedCollection = selectedCollection;
+
+    this.showingCollection = this.eventDisplay
+      .getCollection(selectedCollection)
+      .map((object: any) => ({
+        ...object,
+        isCut: this.isObjectCut(object, eventDataGroup),
+      }));
+
+    this.collectionColumns = Object.keys(this.showingCollection[0]).filter(
+      (column) => !this.excludedColumns.includes(column),
+    );
+  }
+
+  /**
+   * Check whether an object is hidden by filtering.
+   * For InstancedMesh CaloCells, checks the instance matrix for zero-scale.
+   */
+  private isObjectCut(object: any, eventDataGroup: any): boolean {
+    const sceneObject = eventDataGroup?.getObjectByProperty(
+      'uuid',
+      object.uuid,
+    );
+    if (!sceneObject) return false;
+
+    // InstancedMesh: check if instance matrix is zero-scale
+    if (
+      sceneObject.userData?._isInstancedCaloCells &&
+      object._instanceId !== undefined
+    ) {
+      if (!sceneObject.userData._originalMatrices) {
+        return false; // No filtering applied yet — all visible
+      }
+      const arr = sceneObject.instanceMatrix.array;
+      const off = object._instanceId * 16;
+      // Zero-scale matrix has diagonal elements [0],[5],[10] = 0
+      return arr[off] === 0 && arr[off + 5] === 0 && arr[off + 10] === 0;
+    }
+
+    return !sceneObject.visible;
+  }
+
+  sort(column: string, order: string) {
+    if (order === 'asc')
+      this.showingCollection.sort((a, b) => (a[column] < b[column] ? -1 : 1));
+    else
+      this.showingCollection.sort((a, b) => (a[column] > b[column] ? -1 : 1));
+  }
+
+  lookAtObject(uuid: string) {
+    if (uuid) {
+      this.activeObject.update(uuid);
+      this.eventDisplay.lookAtObject(uuid);
+    }
+  }
+
+  highlightObject(uuid: string) {
+    if (uuid) {
+      this.activeObject.update(uuid);
+      this.eventDisplay.highlightObject(uuid);
+    }
+  }
+
+  enableHighlighting() {
+    this.eventDisplay.enableHighlighting();
+  }
+
+  disableHighlighting() {
+    this.eventDisplay.disableHighlighting();
+  }
+
+  toggleInvisible(checked: boolean) {
+    this.hideInvisible = checked;
+  }
+
+  formatValue(value: any): string {
+    if (typeof value === 'number') {
+      return Number.isInteger(value) ? String(value) : value.toFixed(2);
+    }
+    if (Array.isArray(value)) {
+      // Handles nested arrays too, e.g. track `pos`: an array of [x, y, z]
+      // points, so each element is itself an array, not a number.
+      return `[${value.map((v) => this.formatValue(v)).join(', ')}]`;
+    }
+    // Vector-like objects (e.g. THREE.Vector3), which otherwise stringify
+    // to the unhelpful "[object Object]".
+    if (
+      value &&
+      typeof value === 'object' &&
+      typeof value.x === 'number' &&
+      typeof value.y === 'number'
+    ) {
+      const parts = [value.x, value.y, value.z].filter(
+        (v) => typeof v === 'number',
+      );
+      return `[${parts.map((v) => this.formatValue(v)).join(', ')}]`;
+    }
+    return String(value);
+  }
+
+  addLabel(index: number, uuid: string) {
+    const labelValue = this.elementRef.nativeElement.querySelector(
+      `#label${index}`,
+    ).value;
+    if (this.selectedCollection) {
+      // Empty labelValue will remove the label object
+      this.eventDisplay.addLabelToObject(
+        labelValue,
+        this.selectedCollection,
+        index,
+        uuid,
+      );
+    }
+  }
+
+  private getEventDataGroup() {
+    return this.eventDisplay
+      .getThreeManager()
+      .getSceneManager()
+      .getScene()
+      .getObjectByName(SceneManager.EVENT_DATA_ID);
+  }
+}

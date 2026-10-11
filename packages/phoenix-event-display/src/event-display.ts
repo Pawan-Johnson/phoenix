@@ -1,11 +1,30 @@
-import { ThreeManager } from './three/index';
-import { UIManager } from './ui/index';
-import { InfoLogger } from './info-logger';
-import { Configuration } from './extras/configuration';
-import { StateManager } from './managers/state-manager';
-import { LoadingManager } from './managers/loading-manager';
-import { URLOptionsManager } from './managers/url-options-manager';
+import { httpRequest, settings as jsrootSettings, openFile } from 'jsroot';
+import { build } from 'jsroot/geom';
 import { ActiveVariable } from './helpers/active-variable';
+import { InfoLogger } from './helpers/info-logger';
+import { getLabelTitle } from './helpers/labels';
+import type { Configuration } from './lib/types/configuration';
+import { PhoenixLoader } from './loaders/phoenix-loader';
+import { LoadingManager } from './managers/loading-manager';
+import { StateManager } from './managers/state-manager';
+import type { AnimationPreset } from './managers/three-manager/animations-manager';
+import { ThreeManager } from './managers/three-manager/index';
+import { SceneManager } from './managers/three-manager/scene-manager';
+import { XRSessionType } from './managers/three-manager/xr/xr-manager';
+import { UIManager } from './managers/ui-manager/index';
+import { URLOptionsManager } from './managers/url-options-manager';
+import type {
+  PhoenixEventData,
+  PhoenixEventsData,
+} from './lib/types/event-data';
+import {
+  buildEventSummaries,
+  type EventSummary,
+} from './helpers/event-summary';
+import {
+  SessionManager,
+  type SessionManagerHost,
+} from './managers/session-manager';
 
 declare global {
   /**
@@ -22,13 +41,27 @@ declare global {
  */
 export class EventDisplay {
   /** Configuration for preset views and event data loader. */
-  private configuration: Configuration;
+  public configuration: Configuration;
   /** An object containing event data. */
-  private eventsData: any;
+  private eventsData: PhoenixEventsData;
+  /** Currently displayed event key. */
+  private currentEventKey: string | null = null;
   /** Array containing callbacks to be called when events change. */
   private onEventsChange: ((events: any) => void)[] = [];
   /** Array containing callbacks to be called when the displayed event changes. */
   private onDisplayedEventChange: ((nowDisplayingEvent: any) => void)[] = [];
+  /** Callbacks to be called on scene state / visibility / cut changes. */
+  private onStateChange: (() => void)[] = [];
+  /** Generic event bus for integration with external frameworks. */
+  private eventBus: Map<string, Set<(data: any) => void>> = new Map();
+  /** Wildcard subscribers fired on every emit (recorders, external bridges). */
+  private eventBusWildcard: Set<(eventName: string, data: any) => void> =
+    new Set();
+  /** Session recorder/player coordinator for #883 (lazy initialized). */
+  private sessionManager: SessionManager | null = null;
+  /** Stored keydown handler for session recording shortcut. */
+  private sessionRecordKeydownHandler: ((e: KeyboardEvent) => void) | null =
+    null;
   /** Three manager for three.js operations. */
   private graphicsLibrary: ThreeManager;
   /** Info logger for storing event display logs. */
@@ -39,6 +72,12 @@ export class EventDisplay {
   private loadingManager: LoadingManager;
   /** State manager for managing event display state. */
   private stateManager: StateManager;
+  /** URL manager for managing options given through URL. */
+  private urlOptionsManager: URLOptionsManager;
+  /** Flag to track if EventDisplay has been initialized. */
+  private isInitialized: boolean = false;
+  /** Stored keydown handler for event navigation shortcuts. */
+  private eventNavKeydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
   /**
    * Create the Phoenix event display and intitialize all the elements.
@@ -49,6 +88,7 @@ export class EventDisplay {
     this.infoLogger = new InfoLogger();
     this.graphicsLibrary = new ThreeManager(this.infoLogger);
     this.ui = new UIManager(this.graphicsLibrary);
+    this.ui.onStateChange = () => this.triggerStateChange();
     if (configuration) {
       this.init(configuration);
     }
@@ -59,6 +99,10 @@ export class EventDisplay {
    * @param configuration Configuration used to customize different aspects.
    */
   public init(configuration: Configuration) {
+    if (this.isInitialized) {
+      this.cleanup();
+    }
+    this.isInitialized = true;
     this.configuration = configuration;
 
     // Initialize the three manager with configuration
@@ -75,9 +119,9 @@ export class EventDisplay {
     this.graphicsLibrary.setAnimationLoop(uiLoop);
 
     // Process and apply URL options
+    this.urlOptionsManager = new URLOptionsManager(this, configuration);
     if (configuration.allowUrlOptions !== false) {
-      const urlOptionsManager = new URLOptionsManager(this, configuration);
-      urlOptionsManager.applyOptions();
+      this.urlOptionsManager.applyOptions();
     }
 
     // Allow adding elements through console
@@ -87,18 +131,179 @@ export class EventDisplay {
   }
 
   /**
-   * Initialize VR.
-   * @param onSessionEnded Callback when the VR session ends.
+   * Cleanup event listeners and resources before re-initialization.
    */
-  public initVR(onSessionEnded?: () => void) {
-    this.graphicsLibrary.initVRSession(onSessionEnded);
+  public cleanup() {
+    if (this.graphicsLibrary) {
+      this.graphicsLibrary.cleanup();
+    }
+    if (this.ui) {
+      this.ui.cleanup();
+    }
+    // Clean up event navigation keyboard handler
+    if (this.eventNavKeydownHandler) {
+      document.removeEventListener('keydown', this.eventNavKeydownHandler);
+      this.eventNavKeydownHandler = null;
+    }
+    // Clean up session recording keyboard handler
+    if (this.sessionRecordKeydownHandler) {
+      document.removeEventListener('keydown', this.sessionRecordKeydownHandler);
+      this.sessionRecordKeydownHandler = null;
+    }
+    // Stop any active session recording or playback
+    this.sessionManager?.cleanup();
+    // Drop any debounced state change so its callbacks cannot run after teardown
+    if (this.stateChangeTimeout) {
+      clearTimeout(this.stateChangeTimeout);
+      this.stateChangeTimeout = null;
+    }
+    // Clear accumulated callbacks
+    this.onEventsChange = [];
+    this.onDisplayedEventChange = [];
+    this.onStateChange = [];
+    this.eventBus.clear();
+    this.eventBusWildcard.clear();
+    // Reset singletons for clean view transition
+    this.loadingManager?.reset();
+    this.stateManager?.resetForViewTransition();
+  }
+
+  /**
+   * Subscribe to a named event on the integration event bus.
+   * Allows external frameworks to react to actions like particle tagging
+   * or result recording.
+   *
+   * Standard event names:
+   * - `'particle-tagged'`: Fired when a particle is tagged in the masterclass panel.
+   * - `'particle-untagged'`: Fired when a tagged particle is removed.
+   * - `'result-recorded'`: Fired when an invariant mass result is recorded (payload `mass` in GeV).
+   *
+   * @param eventName The event name to listen for.
+   * @param callback Callback invoked with event-specific data.
+   * @returns Unsubscribe function to remove the listener.
+   */
+  public on(eventName: string, callback: (data: any) => void): () => void {
+    if (!this.eventBus.has(eventName)) {
+      this.eventBus.set(eventName, new Set());
+    }
+    this.eventBus.get(eventName).add(callback);
+    return () => {
+      const listeners = this.eventBus.get(eventName);
+      if (listeners) {
+        listeners.delete(callback);
+        if (listeners.size === 0) {
+          this.eventBus.delete(eventName);
+        }
+      }
+    };
+  }
+
+  /**
+   * Emit a named event on the integration event bus.
+   * Named subscribers fire first, then wildcard subscribers.
+   * @param eventName The event name to emit.
+   * @param data Data to pass to listeners.
+   */
+  public emit(eventName: string, data?: any): void {
+    const listeners = this.eventBus.get(eventName);
+    if (listeners) {
+      listeners.forEach((cb) => cb(data));
+    }
+    if (this.eventBusWildcard.size > 0) {
+      this.eventBusWildcard.forEach((cb) => cb(eventName, data));
+    }
+  }
+
+  /**
+   * Subscribe to every event-bus emission, regardless of name.
+   * Used by the session recorder (#883) and external bridges that want a
+   * single hook into all integration events.
+   * @param callback Invoked with (eventName, data) on every emit.
+   * @returns Unsubscribe function to remove the listener.
+   */
+  public onAny(callback: (eventName: string, data: any) => void): () => void {
+    this.eventBusWildcard.add(callback);
+    return () => {
+      this.eventBusWildcard.delete(callback);
+    };
+  }
+
+  /**
+   * Get the SessionManager (#883) for recording and replaying exploration.
+   * Lazily instantiated so the manager is only created when the feature is used.
+   * @returns The SessionManager singleton for this EventDisplay.
+   */
+  public getSessionManager(): SessionManager {
+    if (!this.sessionManager) {
+      this.sessionManager = new SessionManager(this.buildSessionHost());
+    }
+    return this.sessionManager;
+  }
+
+  /**
+   * Build the host adapter that bridges SessionManager to the live
+   * EventDisplay (event bus, state snapshot, camera apply).
+   */
+  private buildSessionHost(): SessionManagerHost {
+    return {
+      onAny: (cb) => this.onAny(cb),
+      emit: (name, data) => this.emit(name, data),
+      getStateSnapshot: () => {
+        try {
+          return this.getStateManager()?.getStateAsJSON() ?? {};
+        } catch {
+          return {};
+        }
+      },
+      applyStateSnapshot: (state) => {
+        try {
+          this.getStateManager()?.loadStateFromJSON(state);
+        } catch {
+          // ignore: replay still proceeds even if state apply fails
+        }
+      },
+      getCameraSample: () => {
+        const stateManager = this.getStateManager();
+        const activeCamera = stateManager?.activeCamera;
+        const controls = this.graphicsLibrary
+          ?.getControlsManager?.()
+          ?.getMainControls?.();
+        if (!activeCamera || !controls) return null;
+        const pos = activeCamera.position;
+        const target = controls.target;
+        return {
+          pos: [pos.x, pos.y, pos.z],
+          target: [target.x, target.y, target.z],
+        };
+      },
+      applyCamera: (pos, target) => {
+        const activeCamera = this.getStateManager()?.activeCamera;
+        const controls = this.graphicsLibrary
+          ?.getControlsManager?.()
+          ?.getMainControls?.();
+        if (!activeCamera || !controls) return;
+        activeCamera.position.set(pos[0], pos[1], pos[2]);
+        controls.target.set(target[0], target[1], target[2]);
+        controls.update();
+      },
+    };
+  }
+
+  /**
+   * Initialize XR.
+   * @param xrSessionType Type of the XR session. Either AR or VR.
+   * @param onSessionEnded Callback when the XR session ends.
+   */
+  public initXR(xrSessionType: XRSessionType, onSessionEnded?: () => void) {
+    this.graphicsLibrary.initXRSession(xrSessionType, onSessionEnded);
   }
 
   /**
    * End VR and remove VR settings.
+   * @param xrSessionType Type of the XR session. Either AR or VR.
    */
-  public endVR() {
-    this.graphicsLibrary.endVRSession();
+  public endXR(xrSessionType: XRSessionType) {
+    this.graphicsLibrary.endXRSession(xrSessionType);
   }
 
   /**
@@ -107,13 +312,16 @@ export class EventDisplay {
    * @param eventsData Object containing the event data.
    * @returns Array of strings containing the keys of the eventsData object.
    */
-  public parsePhoenixEvents(eventsData: any): string[] {
+  public parsePhoenixEvents(eventsData: PhoenixEventsData): string[] {
     this.eventsData = eventsData;
-    const eventKeys = this.configuration.eventDataLoader.getEventsList(
-      eventsData
-    );
+    if (typeof this.configuration.eventDataLoader === 'undefined') {
+      this.configuration.eventDataLoader = new PhoenixLoader();
+    }
+    const eventKeys =
+      this.configuration.eventDataLoader.getEventsList(eventsData);
     this.loadEvent(eventKeys[0]);
     this.onEventsChange.forEach((callback) => callback(eventKeys));
+
     return eventKeys;
   }
 
@@ -122,22 +330,27 @@ export class EventDisplay {
    * of physics objects.
    * @param eventData Object containing the event data.
    */
-  public buildEventDataFromJSON(eventData: any) {
+  public buildEventDataFromJSON(eventData: PhoenixEventData) {
+    // Reset labels
+    this.resetLabels();
     // Creating UI folder
     this.ui.addEventDataFolder();
     this.ui.addLabelsFolder();
     // Clearing existing event data
     this.graphicsLibrary.clearEventData();
     // Build data and add to scene
-    this.configuration.eventDataLoader.buildEventData(
-      eventData,
-      this.graphicsLibrary,
-      this.ui,
-      this.infoLogger
-    );
+    if (this.configuration.eventDataLoader) {
+      this.configuration.eventDataLoader.buildEventData(
+        eventData,
+        this.graphicsLibrary,
+        this.ui,
+        this.infoLogger,
+      );
+    }
     this.onDisplayedEventChange.forEach((callback) => callback(eventData));
     // Reload the event data state in Phoenix menu
-    this.ui.loadEventFolderPMState();
+    this.ui.loadEventFolderPhoenixMenuState();
+    this.triggerStateChange();
   }
 
   /**
@@ -145,12 +358,67 @@ export class EventDisplay {
    * the event associated with that key.
    * @param eventKey String that represents the event in the eventsData object.
    */
-  public loadEvent(eventKey: any) {
+  public loadEvent(eventKey: string) {
     const event = this.eventsData[eventKey];
 
     if (event) {
+      this.currentEventKey = eventKey;
       this.buildEventDataFromJSON(event);
     }
+  }
+
+  /**
+   * Get the currently displayed event key.
+   */
+  public getCurrentEventKey(): string | null {
+    return this.currentEventKey;
+  }
+
+  /**
+   * Load the next event in the event list.
+   * Wraps around to the first event after the last.
+   */
+  public nextEvent() {
+    if (!this.eventsData) return;
+    const keys = Object.keys(this.eventsData);
+    if (keys.length === 0) return;
+    const currentIndex = this.currentEventKey
+      ? keys.indexOf(this.currentEventKey)
+      : -1;
+    const nextIndex = (currentIndex + 1) % keys.length;
+    this.loadEvent(keys[nextIndex]);
+  }
+
+  /**
+   * Load the previous event in the event list.
+   * Wraps around to the last event before the first.
+   */
+  public previousEvent() {
+    if (!this.eventsData) return;
+    const keys = Object.keys(this.eventsData);
+    if (keys.length === 0) return;
+    const currentIndex = this.currentEventKey
+      ? keys.indexOf(this.currentEventKey)
+      : -1;
+    const prevIndex = currentIndex <= 0 ? keys.length - 1 : currentIndex - 1;
+    this.loadEvent(keys[prevIndex]);
+  }
+
+  /**
+   * Get all loaded events data.
+   * @returns The events data object, or undefined if no events loaded.
+   */
+  public getEventsData(): PhoenixEventsData | undefined {
+    return this.eventsData;
+  }
+
+  /**
+   * Build summaries of all loaded events for the event browser.
+   * @returns Array of event summaries with collection counts and metadata.
+   */
+  public getEventSummaries(): EventSummary[] {
+    if (!this.eventsData) return [];
+    return buildEventSummaries(this.eventsData);
   }
 
   /**
@@ -193,7 +461,16 @@ export class EventDisplay {
     if (!this.stateManager) {
       this.stateManager = new StateManager();
     }
+
     return this.stateManager;
+  }
+
+  /**
+   * Get the URL options manager that manages options given through URL.
+   * @returns The URL options manager.
+   */
+  public getURLOptionsManager() {
+    return this.urlOptionsManager;
   }
 
   // **********************
@@ -208,30 +485,33 @@ export class EventDisplay {
    * @param color Color to initialize the geometry.
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
    * @param doubleSided If true, render both sides of the material.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
-   * @param setFlat Whether object should be flat-shaded or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
+   * @param setFlat Whether object should be flat-shaded or not. Default `true`.
    * @returns Promise for loading the geometry.
    */
-  public loadOBJGeometry(
+  public async loadOBJGeometry(
     filename: string,
     name: string,
     color: any,
-    menuNodeName?: string,
-    doubleSided?: boolean,
+    menuNodeName: string,
+    doubleSided: boolean,
     initiallyVisible: boolean = true,
-    setFlat: boolean = true
-  ): Promise<unknown> {
+    setFlat: boolean = true,
+  ): Promise<void> {
     this.loadingManager.addLoadableItem(`obj_geom_${name}`);
-    this.ui.addGeometry(name, color, menuNodeName, initiallyVisible);
-    this.infoLogger.add(name, 'Loaded OBJ geometry');
-    return this.graphicsLibrary.loadOBJGeometry(
+
+    const { object } = await this.graphicsLibrary.loadOBJGeometry(
       filename,
       name,
       color,
       doubleSided,
       initiallyVisible,
-      setFlat
+      setFlat,
     );
+    this.ui.addGeometry(object, menuNodeName);
+
+    this.loadingManager.itemLoaded(`obj_geom_${name}`);
+    this.infoLogger.add(name, 'Loaded OBJ geometry');
   }
 
   /**
@@ -240,17 +520,22 @@ export class EventDisplay {
    * @param content Content of the OBJ geometry.
    * @param name Name given to the geometry.
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
    */
   public parseOBJGeometry(
     content: string,
     name: string,
     menuNodeName?: string,
-    initiallyVisible: boolean = true
+    initiallyVisible: boolean = true,
   ) {
     this.loadingManager.addLoadableItem(`parse_obj_${name}`);
-    this.graphicsLibrary.parseOBJGeometry(content, name, initiallyVisible);
-    this.ui.addGeometry(name, 0x000fff, menuNodeName, initiallyVisible);
+    const { object } = this.graphicsLibrary.parseOBJGeometry(
+      content,
+      name,
+      initiallyVisible,
+    );
+    this.ui.addGeometry(object, menuNodeName);
+    this.loadingManager.itemLoaded(`parse_obj_${name}`);
   }
 
   /**
@@ -267,7 +552,7 @@ export class EventDisplay {
    * and other configuration.
    * @returns Promise for loading the geometry.
    */
-  public parsePhoenixDisplay(input: any): Promise<unknown> {
+  public async parsePhoenixDisplay(input: any): Promise<void> {
     const phoenixScene = JSON.parse(input);
 
     if (phoenixScene.sceneConfiguration && phoenixScene.scene) {
@@ -280,7 +565,8 @@ export class EventDisplay {
       this.loadSceneConfiguration(phoenixScene.sceneConfiguration);
 
       this.loadingManager.addLoadableItem(`parse_phnx_${name}`);
-      return this.graphicsLibrary.parsePhnxScene(phoenixScene.scene);
+      await this.graphicsLibrary.parsePhnxScene(phoenixScene.scene);
+      this.loadingManager.itemLoaded(`parse_phnx_${name}`);
     }
   }
 
@@ -292,19 +578,22 @@ export class EventDisplay {
   }
 
   /**
-   * Parses and loads a geometry in GLTF (.gltf) format.
-   * @param input Data of the GLTF (.gltf) file.
-   * @param name Name given to the geometry.
+   * Parses and loads a geometry in GLTF (.gltf or .glb) format.
+   * also supports zip files of the above
+   * @param file Geometry file in GLTF (.gltf or .glb) format.
    * @returns Promise for loading the geometry.
    */
-  public parseGLTFGeometry(
-    input: string | ArrayBuffer,
-    name: string
-  ): Promise<unknown> {
+  public async parseGLTFGeometry(file: File): Promise<void> {
+    const name = file.name.split('/').pop();
     this.loadingManager.addLoadableItem(`parse_gltf_${name}`);
-    this.ui.addGeometry(name, undefined);
-    this.infoLogger.add(name, 'Parsed GLTF geometry');
-    return this.graphicsLibrary.parseGLTFGeometry(input, name);
+
+    const allGeometriesUIParameters =
+      await this.graphicsLibrary.parseGLTFGeometry(file);
+    for (const { object, menuNodeName } of allGeometriesUIParameters) {
+      this.ui.addGeometry(object, menuNodeName);
+    }
+
+    this.loadingManager.itemLoaded(`parse_gltf_${name}`);
   }
 
   /**
@@ -314,25 +603,31 @@ export class EventDisplay {
    * @param name Name of the loaded scene/geometry.
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
    * @param scale Scale of the geometry.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
    * @returns Promise for loading the geometry.
    */
-  public loadGLTFGeometry(
+  public async loadGLTFGeometry(
     url: any,
     name: string,
-    menuNodeName?: string,
-    scale?: number,
-    initiallyVisible: boolean = true
-  ): Promise<unknown> {
+    menuNodeName?: string | undefined,
+    scale: number = 1.0,
+    initiallyVisible: boolean = true,
+  ): Promise<void> {
     this.loadingManager.addLoadableItem(`gltf_geom_${name}`);
-    this.ui.addGeometry(name, undefined, menuNodeName, initiallyVisible);
-    this.infoLogger.add(name, 'Loaded GLTF geometry');
-    return this.graphicsLibrary.loadGLTFGeometry(
-      url,
-      name,
-      scale,
-      initiallyVisible
-    );
+
+    const allGeometriesUIParameters =
+      await this.graphicsLibrary.loadGLTFGeometry(
+        url,
+        name,
+        menuNodeName,
+        scale,
+        initiallyVisible,
+      );
+    for (const { object, menuNodeName } of allGeometriesUIParameters) {
+      this.ui.addGeometry(object, menuNodeName);
+    }
+
+    this.loadingManager.itemLoaded(`gltf_geom_${name}`);
   }
 
   /**
@@ -342,97 +637,100 @@ export class EventDisplay {
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
    * @param scale Scale of the geometry.
    * @param doubleSided Renders both sides of the material.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
    * @returns Promise for loading the geometry.
    */
-  public loadJSONGeometry(
-    json: string | object,
+  public async loadJSONGeometry(
+    json: string | { [key: string]: any },
     name: string,
     menuNodeName?: string,
     scale?: number,
     doubleSided?: boolean,
-    initiallyVisible: boolean = true
-  ): Promise<unknown> {
+    initiallyVisible: boolean = true,
+  ): Promise<void> {
     this.loadingManager.addLoadableItem(`json_geom_${name}`);
-    this.ui.addGeometry(name, undefined, menuNodeName, initiallyVisible);
-    this.infoLogger.add(name, 'Loaded JSON geometry');
-    return this.graphicsLibrary.loadJSONGeometry(
+
+    const { object } = await this.graphicsLibrary.loadJSONGeometry(
       json,
       name,
       scale,
       doubleSided,
-      initiallyVisible
+      initiallyVisible,
     );
+    this.ui.addGeometry(object, menuNodeName);
+
+    this.loadingManager.itemLoaded(`json_geom_${name}`);
+    this.infoLogger.add(name, 'Loaded JSON geometry');
   }
 
   /**
    * Load JSON geometry from JSRoot.
-   * @param JSROOT JSRoot object containing all the JSROOT functions.
    * @param url URL of the JSRoot geometry file.
    * @param name Name of the geometry.
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
    * @param scale Scale of the geometry.
    * @param doubleSided Renders both sides of the material.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
    */
-  public loadRootJSONGeometry(
-    JSROOT: any,
+  public async loadRootJSONGeometry(
     url: string,
     name: string,
     menuNodeName?: string,
     scale?: number,
     doubleSided?: boolean,
-    initiallyVisible: boolean = true
+    initiallyVisible: boolean = true,
   ) {
     this.loadingManager.addLoadableItem('root_json_geom');
-    JSROOT.NewHttpRequest(url, 'object', (obj: any) => {
-      this.loadJSONGeometry(
-        JSROOT.GEO.build(obj, { dflt_colors: true }).toJSON(),
-        name,
-        menuNodeName,
-        scale,
-        doubleSided,
-        initiallyVisible
-      );
-      this.loadingManager.itemLoaded('root_json_geom');
-    }).send();
+
+    const object = await httpRequest(url, 'object');
+    await this.loadJSONGeometry(
+      build(object, { dflt_colors: true }).toJSON(),
+      name,
+      menuNodeName,
+      scale,
+      doubleSided,
+      initiallyVisible,
+    );
+
+    this.loadingManager.itemLoaded('root_json_geom');
   }
 
   /**
    * Load ROOT geometry from JSRoot.
-   * @param JSROOT JSRoot object containing all the JSROOT functions.
    * @param url URL of the JSRoot file.
    * @param objectName Name of the object inside the ".root" file.
    * @param name Name of the geometry.
    * @param menuNodeName Name of the node in Phoenix menu to add the geometry to. Use >  as a separator for specifying the hierarchy for sub-folders.
    * @param scale Scale of the geometry.
    * @param doubleSided Renders both sides of the material.
-   * @param initiallyVisible Whether the geometry is initially visible or not.
+   * @param initiallyVisible Whether the geometry is initially visible or not. Default `true`.
    */
-  public loadRootGeometry(
-    JSROOT: any,
+  public async loadRootGeometry(
     url: string,
     objectName: string,
     name: string,
     menuNodeName?: string,
     scale?: number,
     doubleSided?: boolean,
-    initiallyVisible: boolean = true
+    initiallyVisible: boolean = true,
   ) {
-    if (url.indexOf('.root') > 0) {
-      JSROOT.openFile(url).then((file: any) => {
-        file.readObject(objectName).then((obj: any) => {
-          this.loadJSONGeometry(
-            JSROOT.GEO.build(obj, { dflt_colors: true }).toJSON(),
-            name,
-            menuNodeName,
-            scale,
-            doubleSided,
-            initiallyVisible
-          );
-        });
-      });
-    }
+    this.loadingManager.addLoadableItem('root_geom');
+    // See https://github.com/root-project/jsroot/blob/19ce116b68701ab45e0a092c673119bf97ede0c2/modules/core.mjs#L241.
+    jsrootSettings.UseStamp = false;
+
+    const file = await openFile(url);
+    const obj = await file.readObject(objectName);
+
+    await this.loadJSONGeometry(
+      build(obj, { dflt_colors: true }).toJSON(),
+      name,
+      menuNodeName,
+      scale,
+      doubleSided,
+      initiallyVisible,
+    );
+
+    this.loadingManager.itemLoaded('root_geom');
   }
 
   /**
@@ -459,16 +757,15 @@ export class EventDisplay {
    * @param sceneConfiguration Scene configuration containingevent data and detector geometry.
    */
   private loadSceneConfiguration(sceneConfiguration: {
-    eventData: {};
-    geometries: [];
+    eventData: { [key: string]: any };
+    geometries: any[];
   }) {
     for (const objectType of Object.keys(sceneConfiguration.eventData)) {
-      const typeFolder = this.ui.addEventDataTypeFolder(objectType);
-      const typeFolderPM = this.ui.addEventDataTypeFolderPM(objectType);
+      this.ui.addEventDataTypeFolder(objectType);
+
       const collections = sceneConfiguration.eventData[objectType];
       for (const collection of collections) {
-        this.ui.addCollection(typeFolder, collection);
-        this.ui.addCollectionPM(typeFolderPM, collection);
+        this.ui.addCollection(objectType, collection);
       }
     }
 
@@ -483,33 +780,171 @@ export class EventDisplay {
    * @returns Object containing all physics objects from the desired collection.
    */
   public getCollection(collectionName: string) {
-    return this.configuration.eventDataLoader.getCollection(collectionName);
+    if (this.configuration.eventDataLoader) {
+      return this.configuration.eventDataLoader.getCollection(collectionName);
+    }
+    return {};
   }
 
   /**
    * Get the different collections for the current stored event.
    * @returns List of strings, each representing a collection of the event displayed.
    */
-  public getCollections(): string[] {
-    return this.configuration.eventDataLoader.getCollections();
+  public getCollections(): { [key: string]: string[] } {
+    if (this.configuration.eventDataLoader) {
+      return this.configuration.eventDataLoader.getCollections();
+    }
+    return {};
   }
 
   /**
    * Add a callback to onDisplayedEventChange array to call
    * the callback on changes to the displayed event.
    * @param callback Callback to be added to the onDisplayedEventChange array.
+   * @returns Unsubscribe function to remove the callback.
    */
-  public listenToDisplayedEventChange(callback: (event) => any) {
+  public listenToDisplayedEventChange(
+    callback: (event: any) => any,
+  ): () => void {
     this.onDisplayedEventChange.push(callback);
+    return () => {
+      const index = this.onDisplayedEventChange.indexOf(callback);
+      if (index > -1) {
+        this.onDisplayedEventChange.splice(index, 1);
+      }
+    };
   }
 
   /**
    * Add a callback to onEventsChange array to call
    * the callback on changes to the events.
    * @param callback Callback to be added to the onEventsChange array.
+   * @returns Unsubscribe function to remove the callback.
    */
-  public listenToLoadedEventsChange(callback: (events) => any) {
+  public listenToLoadedEventsChange(
+    callback: (events: any) => any,
+  ): () => void {
     this.onEventsChange.push(callback);
+    return () => {
+      const index = this.onEventsChange.indexOf(callback);
+      if (index > -1) {
+        this.onEventsChange.splice(index, 1);
+      }
+    };
+  }
+
+  /**
+   * Add a callback to onStateChange array to call
+   * when visibility or cuts change.
+   * @param callback Callback to be added to the onStateChange array.
+   * @returns Unsubscribe function to remove the callback.
+   */
+  public listenToStateChange(callback: () => void): () => void {
+    this.onStateChange.push(callback);
+    return () => {
+      const index = this.onStateChange.indexOf(callback);
+      if (index > -1) {
+        this.onStateChange.splice(index, 1);
+      }
+    };
+  }
+
+  /** Timeout handle for debouncing state change triggers. */
+  private stateChangeTimeout: any = null;
+
+  /**
+   * Trigger state change callbacks (e.g. on visibility or cut change).
+   * Debounced to prevent performance degradation during loading or rapid UI changes.
+   */
+  public triggerStateChange(): void {
+    if (this.loadingManager?.isCurrentlyLoading()) {
+      return;
+    }
+    if (this.stateChangeTimeout) {
+      return;
+    }
+    this.stateChangeTimeout = setTimeout(() => {
+      this.stateChangeTimeout = null;
+      this.onStateChange.forEach((callback) => callback());
+    }, 0);
+  }
+
+  /**
+   * Check if a collection group is visible in the 3D scene.
+   * @param collectionName Name of the collection.
+   * @returns Whether the collection group is visible.
+   */
+  public isCollectionVisible(collectionName: string): boolean {
+    const sceneManager = this.getThreeManager()?.getSceneManager();
+    if (!sceneManager) return true;
+    const eventDataGroup = sceneManager
+      .getScene()
+      .getObjectByName(SceneManager.EVENT_DATA_ID);
+    if (!eventDataGroup || !eventDataGroup.visible) return false;
+    const collectionObject = eventDataGroup.getObjectByName(collectionName);
+    if (!collectionObject) return false;
+
+    let curr: any = collectionObject;
+    while (curr && curr !== eventDataGroup) {
+      if (curr.visible === false) return false;
+      curr = curr.parent;
+    }
+    return true;
+  }
+
+  /**
+   * Check if a specific event data object item is visible in the 3D scene (and passes cuts).
+   * @param collectionName Name of the collection.
+   * @param item The event data item.
+   * @returns Whether the item is visible.
+   */
+  public isItemVisible(collectionName: string, item: any): boolean {
+    if (!item) return false;
+    if (!this.isCollectionVisible(collectionName)) {
+      return false;
+    }
+    // Check 3D object visibility if object with item.uuid exists in scene
+    const sceneManager = this.getThreeManager()?.getSceneManager();
+    if (sceneManager && item.uuid) {
+      const eventDataGroup = sceneManager
+        .getScene()
+        .getObjectByName(SceneManager.EVENT_DATA_ID);
+      const collectionObject = eventDataGroup?.getObjectByName(collectionName);
+      if (collectionObject) {
+        const obj =
+          collectionObject.getObjectByName(item.uuid) ||
+          collectionObject.children.find(
+            (child: any) =>
+              child.userData?.uuid === item.uuid || child.uuid === item.uuid,
+          );
+        if (obj && obj.visible === false) {
+          return false;
+        }
+      }
+    }
+
+    // Check active cuts for this collection
+    const cutsMap = this.getUIManager()
+      ?.getPhoenixMenuUI()
+      ?.getCollectionCuts();
+    const cuts = cutsMap?.[collectionName];
+    if (cuts && cuts.length > 0) {
+      for (const cut of cuts) {
+        let val = item[cut.field];
+        if (val === undefined && cut.field === 'pT') {
+          if (item.dparams && item.dparams.length >= 5) {
+            val = Math.abs(1 / item.dparams[4]) * Math.sin(item.dparams[3]);
+          }
+        }
+        if (val !== undefined && val !== null) {
+          if (!cut.cutPassed(val)) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
   }
 
   /**
@@ -517,7 +952,10 @@ export class EventDisplay {
    * @returns Metadata of the displayed event.
    */
   public getEventMetadata(): any[] {
-    return this.configuration.eventDataLoader.getEventMetadata();
+    if (this.configuration.eventDataLoader) {
+      return this.configuration.eventDataLoader.getEventMetadata();
+    }
+    return [];
   }
 
   /**
@@ -534,17 +972,17 @@ export class EventDisplay {
         name: string,
         colour: any,
         menuNodeName: string,
-        doubleSided: boolean
+        doubleSided: boolean,
       ) => {
         this.loadOBJGeometry(filename, name, colour, menuNodeName, doubleSided);
       },
       loadJSONGeometry: (
-        json: string | object,
+        json: string | { [key: string]: any },
         name: string,
         menuNodeName: string,
         scale?: number,
         doubleSided?: boolean,
-        initiallyVisible: boolean = true
+        initiallyVisible: boolean = true,
       ) => {
         this.loadJSONGeometry(
           json,
@@ -552,11 +990,15 @@ export class EventDisplay {
           menuNodeName,
           scale,
           doubleSided,
-          initiallyVisible
+          initiallyVisible,
         );
       },
-      buildGeometryFromParameters: (parameters: object) =>
+      buildGeometryFromParameters: (parameters: { [key: string]: any }) =>
         this.buildGeometryFromParameters(parameters),
+      scene: this.getThreeManager().getSceneManager().getScene(),
+      on: (eventName: string, callback: (data: any) => void) =>
+        this.on(eventName, callback),
+      emit: (eventName: string, data?: any) => this.emit(eventName, data),
     };
   }
 
@@ -604,18 +1046,43 @@ export class EventDisplay {
    * Move the camera to look at the object with the given uuid
    * and highlight it.
    * @param uuid uuid of the object.
+   * @param detector whether the function is for detector objects or event data.
    */
-  public lookAtObject(uuid: string) {
-    this.graphicsLibrary.lookAtObject(uuid);
-    this.graphicsLibrary.highlightObject(uuid);
+  public lookAtObject(uuid: string, detector: boolean = false) {
+    if (detector == true) {
+      this.graphicsLibrary.lookAtObject(uuid, true);
+      this.graphicsLibrary.highlightObject(uuid, true);
+    } else {
+      this.graphicsLibrary.lookAtObject(uuid);
+      this.graphicsLibrary.highlightObject(uuid);
+    }
   }
 
   /**
    * Highlight the object with the given uuid by giving it an outline.
    * @param uuid uuid of the object.
+   * @param detector whether the function is for detector objects or event data.
    */
-  public highlightObject(uuid: string) {
-    this.graphicsLibrary.highlightObject(uuid);
+  public highlightObject(uuid: string, detector: boolean = false) {
+    if (detector == true) {
+      this.graphicsLibrary.highlightObject(uuid, true);
+    } else {
+      this.graphicsLibrary.highlightObject(uuid, false);
+    }
+  }
+
+  /**
+   * Enable highlighting of the objects.
+   */
+  public enableHighlighting() {
+    this.graphicsLibrary.enableHighlighting();
+  }
+
+  /**
+   * Disable highlighting of the objects.
+   */
+  public disableHighlighting() {
+    this.graphicsLibrary.disableHighlighting();
   }
 
   /**
@@ -624,6 +1091,50 @@ export class EventDisplay {
   public enableKeyboardControls() {
     this.ui.enableKeyboardControls();
     this.graphicsLibrary.enableKeyboardControls();
+
+    // Remove previous event navigation listener if exists
+    if (this.eventNavKeydownHandler) {
+      document.removeEventListener('keydown', this.eventNavKeydownHandler);
+    }
+
+    // Shift+ArrowRight = next event, Shift+ArrowLeft = previous event
+    this.eventNavKeydownHandler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping = ['input', 'textarea', 'select'].includes(
+        target?.tagName.toLowerCase(),
+      );
+      const hasFocusableContent = target?.hasAttribute('tabindex');
+      if (isTyping || hasFocusableContent || !e.shiftKey) return;
+
+      if (e.code === 'ArrowRight') {
+        e.preventDefault();
+        this.nextEvent();
+      } else if (e.code === 'ArrowLeft') {
+        e.preventDefault();
+        this.previousEvent();
+      }
+    };
+    document.addEventListener('keydown', this.eventNavKeydownHandler);
+
+    // Remove previous session recording listener if exists
+    if (this.sessionRecordKeydownHandler) {
+      document.removeEventListener('keydown', this.sessionRecordKeydownHandler);
+    }
+
+    // Shift+S = toggle session recording
+    this.sessionRecordKeydownHandler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isTyping = ['input', 'textarea', 'select'].includes(
+        target?.tagName.toLowerCase(),
+      );
+      if (isTyping) return;
+      if (!e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.code !== 'KeyS') return;
+
+      e.preventDefault();
+      this.getSessionManager().toggleRecording();
+    };
+    document.addEventListener('keydown', this.sessionRecordKeydownHandler);
   }
 
   /**
@@ -635,13 +1146,23 @@ export class EventDisplay {
   public animateThroughEvent(
     startPos: number[],
     tweenDuration: number,
-    onAnimationEnd?: () => void
+    onAnimationEnd?: () => void,
   ) {
     this.graphicsLibrary.animateThroughEvent(
       startPos,
       tweenDuration,
-      onAnimationEnd
+      onAnimationEnd,
     );
+  }
+
+  /**
+   * Animate scene by animating camera through the scene and animating event collision.
+   * @param animationPreset Preset for animation including positions to go through and
+   * event collision animation options.
+   * @param onEnd Function to call when the animation ends.
+   */
+  public animatePreset(animationPreset: AnimationPreset, onEnd?: () => void) {
+    this.graphicsLibrary.animatePreset(animationPreset, onEnd);
   }
 
   /**
@@ -661,7 +1182,7 @@ export class EventDisplay {
    */
   public animateClippingWithCollision(
     tweenDuration: number,
-    onEnd?: () => void
+    onEnd?: () => void,
   ) {
     this.graphicsLibrary.animateClippingWithCollision(tweenDuration, onEnd);
   }
@@ -677,21 +1198,46 @@ export class EventDisplay {
     label: string,
     collection: string,
     indexInCollection: number,
-    uuid: string
+    uuid: string,
   ) {
+    if (!this.configuration.eventDataLoader) {
+      return;
+    }
+
     const labelId = this.configuration.eventDataLoader.addLabelToEventObject(
       label,
       collection,
-      indexInCollection
+      indexInCollection,
     );
 
     // Remove the label if the string is empty
     if (!label) {
-      this.ui.removeLabel(labelId);
+      this.ui.removeLabel(labelId, true);
       return;
     }
 
     this.ui.addLabel(labelId);
     this.graphicsLibrary.addLabelToObject(label, uuid, labelId);
+  }
+
+  /**
+   * Reset/remove all labels.
+   */
+  public resetLabels() {
+    // labelsObject[EventDataType][Collection][Index]
+    if (!this.configuration.eventDataLoader) {
+      return;
+    }
+    const labelsObject = this.configuration.eventDataLoader.getLabelsObject();
+    for (const eventDataType in labelsObject) {
+      for (const collection in labelsObject[eventDataType]) {
+        for (const index in labelsObject[eventDataType][collection]) {
+          const labelId = getLabelTitle(eventDataType, collection, index);
+          this.ui.removeLabel(labelId, true);
+
+          delete labelsObject[eventDataType][collection][index];
+        }
+      }
+    }
   }
 }

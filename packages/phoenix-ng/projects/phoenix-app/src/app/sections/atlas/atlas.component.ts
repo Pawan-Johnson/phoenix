@@ -1,12 +1,16 @@
-import { Component, OnInit } from '@angular/core';
-import { EventDisplayService } from 'phoenix-ui-components';
+import { Component, type OnInit, type OnDestroy } from '@angular/core';
 import {
-  Configuration,
+  EventDataFormat,
+  type EventDataImportOption,
+  EventDisplayService,
+} from 'phoenix-ui-components';
+import {
   PresetView,
   PhoenixMenuNode,
-  PhoenixLoader,
+  JiveXMLLoader,
   StateManager,
 } from 'phoenix-event-display';
+import type { Configuration } from 'phoenix-event-display';
 import { environment } from '../../../environments/environment';
 import eventConfig from '../../../../event-config.json';
 
@@ -14,15 +18,31 @@ import eventConfig from '../../../../event-config.json';
 import phoenixMenuConfig from '../../../assets/files/config/atlas-config.json';
 
 @Component({
+  standalone: false,
   selector: 'app-atlas',
   templateUrl: './atlas.component.html',
   styleUrls: ['./atlas.component.scss'],
 })
-export class AtlasComponent implements OnInit {
+export class AtlasComponent implements OnInit, OnDestroy {
   phoenixMenuRoot = new PhoenixMenuNode('Phoenix Menu', 'phoenix-menu');
+  eventDataImportOptions: EventDataImportOption[] = [
+    EventDataFormat.JSON,
+    EventDataFormat.JIVEXML,
+    EventDataFormat.PHYSLITE,
+    EventDataFormat.ATLASESD,
+    EventDataFormat.ZIP,
+  ];
   loaded = false;
+  loadingProgress = 0;
+
+  /** Prevents callbacks on destroyed component */
+  private isDestroyed = false;
 
   constructor(private eventDisplay: EventDisplayService) {}
+
+  ngOnDestroy() {
+    this.isDestroyed = true;
+  }
 
   ngOnInit() {
     let defaultEvent: { eventFile: string; eventType: string };
@@ -38,13 +58,18 @@ export class AtlasComponent implements OnInit {
 
     // Define the configuration
     const configuration: Configuration = {
-      eventDataLoader: new PhoenixLoader(),
+      eventDataLoader: new JiveXMLLoader([
+        'CombinedMuonTracks',
+        'MuonSpectrometerTracks',
+        'CombinedInDetTracks',
+        'Muons_xAOD',
+      ]),
       presetViews: [
-        new PresetView('Left View', [0, 0, -12000], 'left-cube'),
-        new PresetView('Center View', [-500, 12000, 0], 'top-cube'),
-        new PresetView('Right View', [0, 0, 12000], 'right-cube'),
+        new PresetView('Left View', [0, 0, -12000], [0, 0, 0], 'left-cube'),
+        new PresetView('Center View', [-500, 12000, 0], [0, 0, 0], 'top-cube'),
+        new PresetView('Right View', [0, 0, 12000], [0, 0, 0], 'right-cube'),
       ],
-      defaultView: [4000, 0, 4000],
+      defaultView: [4000, 0, 4000, 0, 0, 0],
       // Set the phoenix menu to be used (defined above)
       phoenixMenuRoot: this.phoenixMenuRoot,
       // Default event data to fallback to if none given in URL
@@ -59,215 +84,205 @@ export class AtlasComponent implements OnInit {
 
     // Magnets + Support
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Barrel-Toroid.gltf',
+      'assets/geometry/ATLAS/Barrel-Toroid.gltf.zip',
       'Barrel Toroid',
       'Magnets',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/End-Cap-Toroid.gltf',
+      'assets/geometry/ATLAS/End-Cap-Toroid.gltf.zip',
       'Endcap',
       'Magnets',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Feet.gltf',
+      'assets/geometry/ATLAS/Feet.gltf.zip',
       'Feet',
       'Magnets',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Warm-Structure.gltf',
+      'assets/geometry/ATLAS/Warm-Structure.gltf.zip',
       'Warm structure',
       'Magnets',
       1000,
-      false
     );
 
     // LAr
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Lar-Barrel.gltf',
+      'assets/geometry/ATLAS/Lar-Barrel.gltf.zip',
       'LAr Barrel',
       'Calorimeters',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Lar-EMEC.gltf',
+      'assets/geometry/ATLAS/Lar-EMEC.gltf.zip',
       'LAr EC1',
       'Calorimeters',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Lar-FCAL.gltf',
+      'assets/geometry/ATLAS/Lar-FCAL.gltf.zip',
       'LAr FCAL',
       'Calorimeters',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Lar-HEC.gltf',
+      'assets/geometry/ATLAS/Lar-HEC.gltf.zip',
       'LAr HEC',
       'Calorimeters',
       1000,
-      false
     );
 
     // Tile
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Tile-Barrel.gltf',
+      'assets/geometry/ATLAS/Tile-Barrel.gltf.zip',
       'Tile Cal',
       'Calorimeters',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Tile-End-Cap.gltf',
+      'assets/geometry/ATLAS/Tile-End-Cap.gltf.zip',
       'Tile Cal EC',
       'Calorimeters',
       1000,
-      false
     );
 
     // Inner Detector
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Beam.gltf',
+      'assets/geometry/ATLAS/Beam.gltf.zip',
       'Beam',
       'Inner Detector',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Pixel.gltf',
+      'assets/geometry/ATLAS/Pixel.gltf.zip',
       'Pixel',
       'Inner Detector',
       1000,
-      true
+      true,
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/SCT-BAR.gltf',
+      'assets/geometry/ATLAS/SCT-BAR.gltf.zip',
       'SCT',
       'Inner Detector',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/SCT-EC.gltf',
+      'assets/geometry/ATLAS/SCT-EC.gltf.zip',
       'SCT Endcaps',
       'Inner Detector',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/TRT-BAR.gltf',
+      'assets/geometry/ATLAS/TRT-BAR.gltf.zip',
       'TRT',
       'Inner Detector',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/TRT-EC.gltf',
+      'assets/geometry/ATLAS/TRT-EC.gltf.zip',
       'TRT Endcaps',
       'Inner Detector',
       1000,
-      false
     );
 
     // Muons
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Extra-Wheel.gltf',
+      'assets/geometry/ATLAS/Extra-Wheel.gltf.zip',
       'Extra wheel',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Big-Wheel.gltf',
+      'assets/geometry/ATLAS/Big-Wheel.gltf.zip',
       'Big wheel',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Outer-Wheel.gltf',
+      'assets/geometry/ATLAS/Outer-Wheel.gltf.zip',
       'Outer Wheel',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Muon-Barrel-Inner.gltf',
+      'assets/geometry/ATLAS/Muon-Barrel-Inner.gltf.zip',
       'Muon Barrel Inner',
       'Muon Spectrometer > Barrel',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Muon-Barrel-Middle.gltf',
+      'assets/geometry/ATLAS/Muon-Barrel-Middle.gltf.zip',
       'Muon Barrel Middle',
       'Muon Spectrometer > Barrel',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Muon-Barrel-Outer.gltf',
+      'assets/geometry/ATLAS/Muon-Barrel-Outer.gltf.zip',
       'Muon Barrel Outer',
       'Muon Spectrometer > Barrel',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Muon-Big-Wheel-MDT.gltf',
+      'assets/geometry/ATLAS/Muon-Big-Wheel-MDT.gltf.zip',
       'Big Wheel MDT ',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Small-Wheel-Chambers.gltf',
+      'assets/geometry/ATLAS/Small-Wheel-Chambers.gltf.zip',
       'Small Wheel',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Small-Wheel-Hub.gltf',
+      'assets/geometry/ATLAS/Small-Wheel-Hub.gltf.zip',
       'Small Wheel Hub',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/Small-Wheel-NJD.gltf',
+      'assets/geometry/ATLAS/Small-Wheel-NJD.gltf.zip',
       'Small Wheel Feet',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/TGC2.gltf',
+      'assets/geometry/ATLAS/TGC2.gltf.zip',
       'TGC2',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
     this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/ATLAS/TGC3.gltf',
+      'assets/geometry/ATLAS/TGC3.gltf.zip',
       'TGC3',
       'Muon Spectrometer > Endcaps',
       1000,
-      false
     );
+
+    this.eventDisplay.getLoadingManager().addProgressListener((progress) => {
+      if (!this.isDestroyed) {
+        this.loadingProgress = progress;
+      }
+    });
 
     // Load the default configuration
     this.eventDisplay.getLoadingManager().addLoadListenerWithCheck(() => {
+      if (this.isDestroyed) return;
+
+      console.log('Loading default configuration.');
       this.loaded = true;
-      const stateManager = new StateManager();
-      stateManager.loadStateFromJSON(phoenixMenuConfig);
+
+      const urlOptionsManager = this.eventDisplay.getURLOptionsManager();
+      const urlConfig = urlOptionsManager.getURLOptions().get('config');
+      const urlState = urlOptionsManager.getURLOptions().get('state');
+
+      // Skip default config if a full view state is provided via URL
+      if (!urlConfig && !urlState) {
+        const stateManager = new StateManager();
+        stateManager.loadStateFromJSON(phoenixMenuConfig);
+      }
     });
   }
 }

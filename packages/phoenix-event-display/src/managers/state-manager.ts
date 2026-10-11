@@ -1,9 +1,14 @@
 import { EventDisplay } from '../event-display';
 import { Camera } from 'three';
-import { PhoenixMenuNode } from '../ui/phoenix-menu/phoenix-menu-node';
+import { PhoenixMenuNode } from './ui-manager/phoenix-menu/phoenix-menu-node';
 import { loadFile, saveFile } from '../helpers/file';
 import { ActiveVariable } from '../helpers/active-variable';
+import { Cut, CutJSON } from '../lib/models/cut.model';
 
+/** Map of collection name to array of serialized cuts, for JSON persistence. */
+export interface CutStateJSON {
+  [collectionName: string]: CutJSON[];
+}
 /**
  * A singleton manager for managing the scene's state.
  */
@@ -14,8 +19,10 @@ export class StateManager {
   phoenixMenuRoot: PhoenixMenuNode;
   /** Whether the clipping is enabled or not. */
   clippingEnabled = new ActiveVariable(false);
-  /** Angle of the clipping. */
-  clippingAngle = new ActiveVariable(0);
+  /** Starting angle of the clipping. */
+  startClippingAngle = new ActiveVariable(0);
+  /** Opening angle of the clipping. */
+  openingClippingAngle = new ActiveVariable(0);
   /** The active camera. */
   activeCamera: Camera;
   /** The event display. */
@@ -55,17 +62,31 @@ export class StateManager {
     if (this.phoenixMenuRoot) {
       // Add save and load config buttons to the root node
       this.phoenixMenuRoot
-        .addConfig('button', {
+        .addConfig({
+          type: 'button',
           label: 'Save state',
           onClick: () => {
             this.saveStateAsJSON();
           },
         })
-        .addConfig('button', {
+        .addConfig({
+          type: 'button',
           label: 'Load state',
           onClick: () => {
             loadFile((data) => {
-              this.loadStateFromJSON(JSON.parse(data));
+              // The file comes from the user, so it may not be valid JSON.
+              // Report the problem instead of throwing out of the callback.
+              let state: any;
+              try {
+                state = JSON.parse(data);
+              } catch (error) {
+                console.error(
+                  'Could not parse state file - invalid JSON.',
+                  error,
+                );
+                return;
+              }
+              this.loadStateFromJSON(state);
             });
           },
         });
@@ -73,20 +94,69 @@ export class StateManager {
   }
 
   /**
+   * Get the current state of the event display as a JSON object.
+   * Now includes active cut state so Save State preserves filters.
+   * @returns The state object with menu, camera, clipping, and cut data.
+   */
+  getStateAsJSON(): { [key: string]: any } {
+    const controls = this.eventDisplay
+      ?.getThreeManager()
+      ?.getControlsManager()
+      ?.getMainControls();
+
+    return {
+      phoenixMenu: this.phoenixMenuRoot?.getNodeState(),
+      eventDisplay: {
+        cameraPosition: this.activeCamera?.position.toArray(),
+        cameraTarget: controls?.target?.toArray(),
+        startClippingAngle: this.clippingEnabled.value
+          ? this.startClippingAngle.value
+          : null,
+        openingClippingAngle: this.clippingEnabled.value
+          ? this.openingClippingAngle.value
+          : null,
+      },
+      cuts: this.getActiveCutsAsJSON(),
+    };
+  }
+
+  /**
+   * Serialize active cuts from PhoenixMenuUI into a plain JSON-safe object.
+   * Only collections with at least one active cut bound are included.
+   * Returns an empty object if no cuts are active or UI is unavailable.
+   */
+  private getActiveCutsAsJSON(): CutStateJSON {
+    const phoenixMenuUI = this.eventDisplay
+      ?.getUIManager()
+      ?.getPhoenixMenuUI?.();
+
+    if (!phoenixMenuUI) {
+      return {};
+    }
+
+    const registry = phoenixMenuUI.getCollectionCuts(); // This returns object { [name: string]: Cut[] }
+    const result: CutStateJSON = {};
+
+    Object.entries(registry).forEach(([collectionName, cuts]) => {
+      const activeCuts = cuts.filter(
+        (cut) => cut.minCutActive || cut.maxCutActive,
+      );
+      if (activeCuts.length > 0) {
+        result[collectionName] = activeCuts.map((cut) => cut.toJSON());
+      }
+    });
+
+    return result;
+  }
+  /**
    * Save the state of the event display as JSON.
    */
   saveStateAsJSON() {
-    const state: object = {
-      phoenixMenu: this.phoenixMenuRoot.getNodeState(),
-      eventDisplay: {
-        cameraPosition: this.activeCamera.position.toArray(),
-        clippingAngle: this.clippingEnabled ? this.clippingAngle : null,
-      },
-    };
+    const state = this.getStateAsJSON();
 
     saveFile(
       JSON.stringify(state),
-      `run${this.eventMetadata.runNumber}_evt${this.eventMetadata.eventNumber}.json`
+      `run${this.eventMetadata.runNumber}_evt${this.eventMetadata.eventNumber}.json`,
     );
   }
 
@@ -94,26 +164,88 @@ export class StateManager {
    * Load the state from JSON.
    * @param json JSON for state.
    */
-  loadStateFromJSON(json: string | object) {
-    const jsonData: object = typeof json === 'string' ? JSON.parse(json) : json;
+  loadStateFromJSON(json: string | { [key: string]: any }) {
+    const jsonData: { [key: string]: any } =
+      typeof json === 'string' ? JSON.parse(json) : json;
 
-    if (jsonData['phoenixMenu']) {
+    if (jsonData['phoenixMenu'] && this.phoenixMenuRoot) {
+      console.log('StateManager: Processing phoenixMenu configuration');
       this.phoenixMenuRoot.loadStateFromJSON(jsonData['phoenixMenu']);
       this.phoenixMenuRoot.configActive = false;
     }
 
     if (jsonData['eventDisplay']) {
-      this.activeCamera.position.fromArray(
-        jsonData['eventDisplay']?.['cameraPosition']
-      );
-      if (jsonData['eventDisplay']?.['clippingAngle']) {
+      console.log('StateManager: Processing eventDisplay configuration');
+      if (jsonData['eventDisplay']?.['cameraPosition']) {
+        this.activeCamera.position.fromArray(
+          jsonData['eventDisplay']['cameraPosition'],
+        );
+      }
+
+      if (jsonData['eventDisplay']?.['cameraTarget']) {
+        const controls = this.eventDisplay
+          ?.getThreeManager()
+          ?.getControlsManager()
+          ?.getMainControls();
+        if (controls) {
+          controls.target.fromArray(jsonData['eventDisplay']['cameraTarget']);
+          controls.update();
+        }
+      }
+
+      const startAngle = jsonData['eventDisplay']?.['startClippingAngle'];
+      const openingAngle = jsonData['eventDisplay']?.['openingClippingAngle'];
+
+      if (startAngle || openingAngle) {
         this.setClippingEnabled(true);
         this.eventDisplay.getUIManager().setClipping(true);
-        this.eventDisplay
-          .getUIManager()
-          .rotateClipping(jsonData['eventDisplay']['clippingAngle']);
+
+        if (startAngle) {
+          this.eventDisplay
+            .getUIManager()
+            .rotateStartAngleClipping(
+              jsonData['eventDisplay']['startClippingAngle'],
+            );
+        }
+        if (openingAngle) {
+          this.eventDisplay
+            .getUIManager()
+            .rotateOpeningAngleClipping(
+              jsonData['eventDisplay']['openingClippingAngle'],
+            );
+        }
       }
     }
+    // Restore cut state if present in the saved JSON
+    if (jsonData['cuts']) {
+      this.restoreCutsFromJSON(jsonData['cuts'] as CutStateJSON);
+    }
+  }
+  /**
+   * Deserialize cut state from a saved JSON file, register the cuts back
+   * into PhoenixMenuUI, and re-apply them to the currently loaded event.
+   * @param cutsJSON The cuts section of a loaded state JSON file.
+   */
+  private restoreCutsFromJSON(cutsJSON: CutStateJSON): void {
+    const phoenixMenuUI = this.eventDisplay
+      ?.getUIManager()
+      ?.getPhoenixMenuUI?.();
+
+    if (!phoenixMenuUI) {
+      console.warn(
+        'StateManager: Cannot restore cuts — PhoenixMenuUI not available.',
+      );
+      return;
+    }
+
+    for (const [collectionName, cutJSONArray] of Object.entries(cutsJSON)) {
+      if (Array.isArray(cutJSONArray) && cutJSONArray.length > 0) {
+        const cuts = cutJSONArray.map((c) => Cut.fromJSON(c));
+        phoenixMenuUI.setCollectionCuts(collectionName, cuts);
+      }
+    }
+
+    phoenixMenuUI.reapplyCollectionCuts();
   }
 
   /**
@@ -125,11 +257,35 @@ export class StateManager {
   }
 
   /**
-   * Set the angle of clipping.
-   * @param angle Angle fo clipping.
+   * Set the start clipping angle of clipping.
+   * @param angle Angle for clipping.
    */
-  setClippingAngle(angle: number) {
-    this.clippingAngle.update(angle);
+  setStartClippingAngle(angle: number) {
+    this.startClippingAngle.update(angle);
+  }
+
+  /**
+   * Get the start clipping angle of clipping.
+   * @returns The starting angle of clipping.
+   */
+  getStartClippingAngle(): number {
+    return this.startClippingAngle.value ?? 0.0;
+  }
+
+  /**
+   * Set the opening angle of clipping.
+   * @param angle Angle for clipping.
+   */
+  setOpeningClippingAngle(angle: number) {
+    this.openingClippingAngle.update(angle);
+  }
+
+  /**
+   * Get the opening angle of clipping.
+   * @returns The opening angle of clipping.
+   */
+  getOpeningClippingAngle(): number {
+    return this.openingClippingAngle.value ?? 0.0;
   }
 
   /**
@@ -146,5 +302,17 @@ export class StateManager {
    */
   setEventDisplay(eventDisplay: EventDisplay) {
     this.eventDisplay = eventDisplay;
+  }
+
+  /**
+   * Reset state manager for view transitions. Clears stale references.
+   */
+  resetForViewTransition() {
+    this.phoenixMenuRoot = undefined;
+    this.activeCamera = undefined;
+    this.clippingEnabled = new ActiveVariable(false);
+    this.startClippingAngle = new ActiveVariable(0);
+    this.openingClippingAngle = new ActiveVariable(0);
+    this.eventMetadata = { runNumber: '000', eventNumber: '000' };
   }
 }

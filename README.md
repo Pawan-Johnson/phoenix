@@ -8,7 +8,7 @@
 [build-img]: https://github.com/HSF/phoenix/actions/workflows/main.yml/badge.svg?branch=master
 [build-link]: https://github.com/HSF/phoenix/actions/workflows/main.yml?query=branch%3Amaster
 [license-img]: https://img.shields.io/github/license/hsf/phoenix.svg
-[license-url]: https://github.com/hsf/phoenix/blob/master/LICENSE
+[license-url]: https://github.com/hsf/phoenix/blob/main/LICENSE
 
 ![Phoenix Logo](https://raw.github.com/HSF/phoenix/master/packages/phoenix-ng/projects/phoenix-app/src/assets/images/logo-text.svg)
 
@@ -16,45 +16,116 @@
 
 Phoenix is a TypeScript-based event display framework, using the popular [three.js](https://threejs.org) library for 3D. It focuses on being experiment agnostic by design, with common tools (such as custom menus, controls, propagators) and the possibility to add experiment specific extensions.
 
-It consists of two packages: a plain TypeScript core library ([phoenix-event-display](./packages/phoenix-event-display/README.md)) and Angular example application ([phoenix-app](./packages/phoenix-ng/README.md)). A React example is also [provided](https://github.com/9inpachi/phoenix-react). The core library can be adapted for any experiment with some simple steps.
+It consists of two packages: a plain TypeScript core library ([phoenix-event-display](./packages/phoenix-event-display/README.md)) and Angular example application ([phoenix-ng](./packages/phoenix-ng/README.md)). A React example is also [provided](https://github.com/9inpachi/phoenix-react). The core library can be adapted for any experiment with some simple steps.
 
 Phoenix is supported by the [HEP Software Foundation](https://hepsoftwarefoundation.org) and is the official web event display of the [ATLAS experiment](https://atlas.cern).
 
-It was selected for Google Summer of Code support in 2019 and 2020.
+It was selected for Google Summer of Code support in 2019, 2020 and 2021.
 
-You can see an online version at [https://hepsoftwarefoundation.org/phoenix/](https://hepsoftwarefoundation.org/phoenix/)
+You can see the stable version at [https://hepsoftwarefoundation.org/phoenix](https://hepsoftwarefoundation.org/phoenix/) and the development version at [http://phoenix-dev2.surge.sh](http://phoenix-dev2.surge.sh).
 
 ## Demo
 
-[![Phoenix demo](https://raw.github.com/HSF/phoenix/master/packages/phoenix-ng/projects/phoenix-app/src/assets/images/video-cover.png)](https://www.youtube.com/watch?v=75MWVRzVvoY)
+[![Phoenix demo](https://raw.github.com/HSF/phoenix/master/packages/phoenix-ng/projects/phoenix-app/src/assets/images/video-cover.png)](https://www.youtube.com/watch?v=ETtkZ-mnzgQ)
 
 ## Packages
 
-* [Phoenix event display API - `phoenix-event-display`](./packages/phoenix-event-display/)
-* [Phoenix application (Angular) - `phoenix-ng`](./packages/phoenix-ng/)
+* [`phoenix-event-display`](./packages/phoenix-event-display/)  
+  Phoenix event display framework
+* [`phoenix-ng`](./packages/phoenix-ng/)  
+  Phoenix Angular application
 
 ## Development
 
-For running both the event display and the Angular app, you will need [Node.js](https://nodejs.org/en/download/), yarn and lerna.
+For running both the event display and the Angular app, you will need [Node.js](https://nodejs.org/en/download/) and Yarn.
 
-Once you have Node.js and npm (npm comes with Node.js), install yarn and lerna.
+* **N.B.** There seems to be a problem with node v21 and ARM devices. See [here](https://github.com/HSF/phoenix/issues/627) for more details.
+
+Once you have Node.js and npm (npm comes with the Node.js), install `corepack`
+(see [Yarn installation instructions](https://yarnpkg.com/getting-started/install))
 
 ```sh
-npm install --global yarn lerna
+npm install --global corepack
 ```
 
-Then run the following set of commands.
+Then run the following commands.
 
 ```sh
-# Install all the required dependencies for both phoenix-event-display
-# and phoenix-app and symlink the packages
-yarn install:dependencies
+# Install all the required dependencies
+yarn install
 
-# Run both packages in development (watch) mode
+# Will prompt you to confirm yarn installation
+
+# For macOS you must install the following:
+# brew install pkg-config cairo pango libpng jpeg giflib librsvg pixman
+
+# For Ubuntu, you may need to install:
+# sudo apt-get install xserver-xorg-dev libxi-dev libxext-dev -y
+# Also, if gyp fails with not being able to find python:
+# sudo ln -s  /usr/bin/python2 /usr/bin/python
+
+# Run phoenix-event-display and phoenix-app in development/watch mode
 yarn start
+# If this does not do anything, make sure you have not missed a warning.
+# e.g. if you are using an older version of node (we are currently using v20), then it may not work
 ```
 
-Now both the `phoenix-event-display` and `phoenix-app` will start in development/watch mode. Any changes made to the `phoenix-event-display` will rebuild and hot reload the `phoenix-app`. You can access the app by navigating to `http://localhost:4200` on the browser.
+Now both the `phoenix-event-display` and `phoenix-app` will start in development/watch mode. You can access the app by navigating to [`http://localhost:4200`](http://localhost:4200) on the browser.
+
+### Picking up changes to `phoenix-event-display`
+
+The two libraries reach the app by different routes, and only one of them hot reloads:
+
+| Package                 | Resolved via                                                                    | Hot reloads |
+| ----------------------- | ------------------------------------------------------------------------------- | ----------- |
+| `phoenix-ui-components` | a TypeScript path mapping straight to its source (`public_api.ts`)              | yes         |
+| `phoenix-event-display` | the `node_modules` symlink, whose `main` is `dist/index` — the **built** output | no          |
+
+So a change to `phoenix-event-display` needs its `dist` rebuilt, and the dev server restarted, because Angular's watcher does not watch inside `node_modules`:
+
+```sh
+yarn workspace phoenix-event-display tsc:build
+# then restart ng serve
+```
+
+`yarn start` builds the library once before handing over to the watch build and the dev server, so a fresh start always serves current code. That one-shot build matters: the watch build and `ng serve` run concurrently, and `ng serve` reliably wins the race, which used to leave it bundling a `dist` from the previous session.
+
+If a change is in `dist` but not in the running app, compare the timestamps — if `dist` is newer than the server, restart it:
+
+```sh
+stat -f '%Sm' packages/phoenix-event-display/dist/loaders/<your-file>.js
+ps -eo pid,lstart,args | grep '[n]g serve'
+```
+
+#### Dependency pre-bundling
+
+Because `phoenix-event-display` resolves through `node_modules`, the dev server would treat it as a third-party dependency and pre-bundle it into `.angular/cache/**/vite/deps/`. That cache is keyed on package metadata rather than file contents, so rebuilding `dist` does not invalidate it and **even restarting the server keeps serving the stale copy** — a change can sit in `dist` for days while the browser shows the old code, with nothing to explain it.
+
+`packages/phoenix-ng/angular.json` therefore excludes it from pre-bundling:
+
+```jsonc
+"serve": {
+  "options": {
+    "prebundle": { "exclude": ["phoenix-event-display"] }
+  }
+}
+```
+
+If you ever see a change that is in `dist`, survives a restart, and still does not appear in the browser debugger, check whether that exclusion is still in place, and clear the cache:
+
+```sh
+rm -rf packages/phoenix-ng/.angular/cache
+```
+
+## Docker
+
+Run the following Docker command to start Phoenix locally using Docker.
+
+```sh
+docker run -dp 80:80 9inpachi/phoenix
+```
+
+Access the app by navigating to [`http://localhost`](http://localhost) on the browser.
 
 ## Documentation
 
@@ -63,10 +134,27 @@ Now both the `phoenix-event-display` and `phoenix-app` will start in development
 * [How to contribute](./CONTRIBUTING.md)
 * [API docs](https://hepsoftwarefoundation.org/phoenix/api-docs/)
 
-## Phoenix presentations
+## Phoenix presentations and publications
 
-Phoenix was presented at the [HSF/WLCG virtual workshop](https://indico.cern.ch/event/941278/contributions/4084836/) and the presentation can be watched on [YouTube](https://www.youtube.com/watch?v=aFvlf9TpyEc&t=347s)
+* Phoenix was presented at the 2020 [HSF/WLCG virtual workshop](https://indico.cern.ch/event/941278/contributions/4084836/) and the presentation can be watched on [YouTube](https://www.youtube.com/watch?v=aFvlf9TpyEc&t=347s)
+* Phoenix was shown at CHEP 2021 ([abstract](https://www.epj-conferences.org/articles/epjconf/pdf/2021/05/epjconf_chep2021_01007.pdf)).
+
+## Examples of Phoenix in use
+
+### ATLAS
+[PhoenixATLAS](https://github.com/ATLAS-experiment/PhoenixATLAS) is the official web event display of the [ATLAS experiment](https://atlas.cern). It can be used to visualise different versions of ATLAS Geometry, and uploaded events.
+
+ATLAS has also used it for embedded events in Physics briefings, e.g. [Heavyweight champions: a search for new heavy W' bosons with the ATLAS detector](https://www.google.com/url?sa=t&rct=j&q=&esrc=s&source=web&cd=&cad=rja&uact=8&ved=2ahUKEwi5vtnp8Yr8AhWw9LsIHeSPBRoQFnoECCAQAQ&url=https%3A%2F%2Fatlas.cern%2Fupdates%2Fbriefing%2Fsearch-heavy-W-bosons&usg=AOvVaw3RpPlPkM5i4gdk2S27cX-C)
+
+### FCC
+Phoenix is also used by [Future Circular Collider](https://fcc.web.cern.ch), see [here](https://fccsw.web.cern.ch/fccsw/phoenix/).
+
+### LHCb
+Phoenix is also used by [LHCb](http://lhcb.web.cern.ch), see [here](https://lhcb-eventdisplay.web.cern.ch/)
+
+### Belle II
+Phoenix is also used by [Belle II](https://www.belle2.org), see [here](https://display.belle2.org/)
+
 
 ## Contact
-
-Best is to either open an issue in GitHub, start a [discussion](https://github.com/HSF/phoenix/discussions) or talk to us on our [gitter channel](https://gitter.im/phoenix-developers/community).
+The best way to contact us is to either open an issue in GitHub, start a [discussion](https://github.com/HSF/phoenix/discussions) or talk to us on our [gitter channel](https://gitter.im/phoenix-developers/community) (though this is not used as much these days).

@@ -1,10 +1,11 @@
+/* eslint-disable */
 const fs = require('fs');
 const { exec } = require('child_process');
 const path = require('path');
 
 if (!fs.existsSync('package.json')) {
   console.log(
-    'Unable to run script.\nUse `yarn gen-api-docs` from directory containing package.json.'
+    'Unable to run script.\nUse `yarn gen-api-docs` from directory containing package.json.',
   );
   process.exit(1);
 }
@@ -18,7 +19,9 @@ const DOCS_NAME = 'Phoenix API Docs';
 const COMPODOC_GEN =
   'yarn compodoc -p configs/compodoc.conf.json -n "' +
   DOCS_NAME +
-  '" -d ../../docs/api-docs';
+  '" -d ../../docs/api-docs' +
+  ' --customLogo ../phoenix-ng/projects/phoenix-app/src/assets/images/logo-text.svg' +
+  ' --customFavicon ../phoenix-ng/projects/phoenix-app/src/favicon.ico';
 
 console.log('Running command: %s', COMPODOC_GEN);
 
@@ -35,34 +38,7 @@ exec(COMPODOC_GEN, (err, stdout, stderr) => {
   replaceInFile(
     path.resolve(__dirname, '../../../docs/api-docs/index.html'),
     '<p.*logo-text.svg.*p>',
-    ''
-  );
-
-  // Replace all text with logo
-  replaceInFile(
-    path.resolve(__dirname, '../../../docs/api-docs/js/menu-wc.js'),
-    DOCS_NAME,
-    '<img data-src="images/logo-text.svg" class="img-responsive" data-type="compodoc-logo">'
-  );
-
-  // Copy icon and logo to API docs folder
-  exec(
-    'cp ../phoenix-ng/projects/phoenix-app/src/favicon.ico ../../docs/api-docs/images/favicon.ico',
-    (err) => {
-      if (err) console.log(err);
-      else {
-        console.log('Copied favicon.ico');
-      }
-    }
-  );
-  exec(
-    'cp ../phoenix-ng/projects/phoenix-app/src/assets/images/logo-text.svg ../../docs/api-docs/images/logo-text.svg',
-    (err) => {
-      if (err) console.log(err);
-      else {
-        console.log('Copied logo-text.svg');
-      }
-    }
+    '',
   );
 });
 
@@ -75,7 +51,7 @@ function replaceInFile(filePath, toReplace, replaceWith) {
     else {
       const replaceData = fileData.replace(
         new RegExp(toReplace, 'g'),
-        replaceWith
+        replaceWith,
       );
       fs.writeFile(filePath, replaceData, 'utf-8', (err) => {
         if (err) console.log('Could not write to file ' + filePath);

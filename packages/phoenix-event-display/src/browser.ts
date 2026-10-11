@@ -1,25 +1,25 @@
 import { LoadingManager } from 'three';
 import { EventDisplay } from './event-display';
-import { Cut } from './extras/cut.model';
-import { PresetView } from './extras/preset-view.model';
+import { Cut } from './lib/models/cut.model';
+import { PresetView } from './lib/models/preset-view.model';
 import { PrettySymbols } from './helpers/pretty-symbols';
 import { RKHelper } from './helpers/rk-helper';
 import { RungeKutta } from './helpers/runge-kutta';
-import { InfoLogger } from './info-logger';
+import { InfoLogger } from './helpers/info-logger';
 import { CMSLoader } from './loaders/cms-loader';
 import { JiveXMLLoader } from './loaders/jivexml-loader';
 import { JSRootEventLoader } from './loaders/jsroot-event-loader';
-import { LHCbLoader } from './loaders/lhcb-loader';
 import { CMSObjects } from './loaders/objects/cms-objects';
 import { PhoenixObjects } from './loaders/objects/phoenix-objects';
 import { PhoenixLoader } from './loaders/phoenix-loader';
+import { Edm4hepJsonLoader } from './loaders/edm4hep-json-loader';
 import { ScriptLoader } from './loaders/script-loader';
 import { TrackmlLoader } from './loaders/trackml-loader';
 import { StateManager } from './managers/state-manager';
 import { URLOptionsManager } from './managers/url-options-manager';
-import { ThreeManager } from './three';
-import { UIManager } from './ui';
-import { PhoenixMenuNode } from './ui/phoenix-menu/phoenix-menu-node';
+import { ThreeManager } from './managers/three-manager/index';
+import { UIManager } from './managers/ui-manager/index';
+import { PhoenixMenuNode } from './managers/ui-manager/phoenix-menu/phoenix-menu-node';
 
 if (typeof globalThis !== 'undefined') {
   // `globalThis` makes Phoenix modules available in the browser
@@ -45,8 +45,8 @@ if (typeof globalThis !== 'undefined') {
     CMSLoader,
     JiveXMLLoader,
     JSRootEventLoader,
-    LHCbLoader,
     PhoenixLoader,
+    Edm4hepJsonLoader,
     ScriptLoader,
     TrackmlLoader,
     // Physics objects

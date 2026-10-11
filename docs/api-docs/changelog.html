@@ -8,13 +8,79 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <link rel="icon" type="image/x-icon" href="./images/favicon.ico">
-	      <link rel="stylesheet" href="./styles/style.css">
+	   <link rel="stylesheet" href="./styles/style.css">
+        <link rel="stylesheet" href="./styles/dark.css">
     </head>
     <body>
+          <script>
+               // Blocking script to avoid flickering dark mode
+               // Dark mode toggle button
+               var useDark = window.matchMedia('(prefers-color-scheme: dark)');
+               var darkModeState = useDark.matches;
+               var $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               var $darkModeToggles = document.querySelectorAll('.dark-mode-switch');
+               var darkModeStateLocal = localStorage.getItem('compodoc_darkmode-state');
 
-        <div class="navbar navbar-default navbar-fixed-top visible-xs">
-            <a href="./" class="navbar-brand">Phoenix API Docs</a>
-            <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               function checkToggle(check) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].checked = check;
+                    }
+               }
+
+               function toggleDarkMode(state) {
+                    if (window.localStorage) {
+                         localStorage.setItem('compodoc_darkmode-state', state);
+                    }
+
+                    checkToggle(state);
+
+                    const hasClass = document.body.classList.contains('dark');
+
+                    if (state) {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.add('dark');
+                         }
+                         if (!hasClass) {
+                              document.body.classList.add('dark');
+                         }
+                    } else {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.remove('dark');
+                         }
+                         if (hasClass) {
+                              document.body.classList.remove('dark');
+                         }
+                    }
+               }
+
+               useDark.addEventListener('change', function (evt) {
+                    toggleDarkMode(evt.matches);
+               });
+               if (darkModeStateLocal) {
+                    darkModeState = darkModeStateLocal === 'true';
+               }
+               toggleDarkMode(darkModeState);
+          </script>
+          <script>
+              // --- Iframe navigation tracking for Template Playground ---
+              function sendCurrentUrlToParent() {
+                  if (window.parent && window.parent !== window) {
+                      window.parent.postMessage({
+                          type: 'compodoc-iframe-navigate',
+                          url: window.location.pathname + window.location.hash
+                      }, '*');
+                  }
+              }
+              window.addEventListener('hashchange', sendCurrentUrlToParent, false);
+              window.addEventListener('popstate', sendCurrentUrlToParent, false);
+              window.addEventListener('DOMContentLoaded', sendCurrentUrlToParent, false);
+          </script>
+
+        <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
+               <div class="d-flex">
+                    <a href="./" class="navbar-brand">Phoenix API Docs</a>
+                    <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               </div>
         </div>
 
         <div class="xs-menu menu" id="mobile-menu">
@@ -23,18 +89,601 @@
 
         <div class="container-fluid main">
            <div class="row main">
-               <div class="hidden-xs menu">
+               <div class="d-none d-md-block menu">
                    <compodoc-menu mode="normal"></compodoc-menu>
                </div>
                <!-- START CONTENT -->
-               <div class="content getting-started">
+               <div class="content changelog">
                    <div class="content-data">
 
-<h1 id="change-log">Change Log</h1>
+
+
+<h1>Change Log</h1>
 <p>All notable changes to this project will be documented in this file.
 See <a href="https://conventionalcommits.org">Conventional Commits</a> for commit guidelines.</p>
-<h1 id="150-2021-03-24"><a href="https://github.com/HSF/phoenix/compare/v1.4.1...v1.5.0">1.5.0</a> (2021-03-24)</h1>
-<h3 id="bug-fixes">Bug Fixes</h3>
+<h2><a href="https://github.com/HSF/phoenix/compare/v4.2.2...v4.2.3">4.2.3</a> (2026-09-12)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> keep a collection&#39;s color over a save and load (<a href="https://github.com/HSF/phoenix/issues/1025">#1025</a>) (<a href="https://github.com/HSF/phoenix/commit/a066d32dacf237ac6464e4cfb2958e98660d4638">a066d32</a>), closes <a href="https://github.com/HSF/phoenix/issues/1023">#1023</a></li>
+<li><strong>event-display:</strong> menu node undefined toggle state (<a href="https://github.com/HSF/phoenix/issues/1024">#1024</a>) (<a href="https://github.com/HSF/phoenix/commit/17973651f4845c8fd0223fbd31ae88577201fd92">1797365</a>), closes <a href="https://github.com/HSF/phoenix/issues/1022">#1022</a></li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>add in-browser histogram panel using jsroot (<a href="https://github.com/HSF/phoenix/issues/840">#840</a>) (<a href="https://github.com/HSF/phoenix/issues/843">#843</a>) (<a href="https://github.com/HSF/phoenix/commit/e9e99451f1bd0d827b91aecece83e614189666e8">e9e9945</a>)</li>
+<li><strong>event-display:</strong> put &quot;Color by&quot; first and color at random from a seed (<a href="https://github.com/HSF/phoenix/issues/1026">#1026</a>) (<a href="https://github.com/HSF/phoenix/commit/a9c339ed8c16c60f19a8e813deb66c5bea4580b7">a9c339e</a>), closes <a href="https://github.com/HSF/phoenix/issues/1023">#1023</a></li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v4.2.1...v4.2.2">4.2.2</a> (2026-09-10)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> jivexml not reading charge correctly (<a href="https://github.com/HSF/phoenix/issues/1019">#1019</a>) (<a href="https://github.com/HSF/phoenix/commit/d7ba11e8d63b117e9393c9f6d8d174e71f81b562">d7ba11e</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v4.2.0...v4.2.1">4.2.1</a> (2026-09-10)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>ui-components,event-display:</strong> declare imported deps, drop dead ones (<a href="https://github.com/HSF/phoenix/issues/1018">#1018</a>) (<a href="https://github.com/HSF/phoenix/commit/6bb3bb765daf691b77db94d5e72c047603dde793">6bb3bb7</a>), closes <a href="https://github.com/HSF/phoenix/issues/1017">#1017</a></li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v4.1.0...v4.2.0">4.2.0</a> (2026-09-10)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>app:</strong> Fix/sync config to gui (<a href="https://github.com/HSF/phoenix/issues/996">#996</a>) (<a href="https://github.com/HSF/phoenix/commit/4be833ae58750486d4473569820c0809d2ee5329">4be833a</a>), closes <a href="https://github.com/HSF/phoenix/issues/ff0000">#ff0000</a></li>
+<li><strong>event-display:</strong>  fix another issue from jsroot 7.11 (<a href="https://github.com/HSF/phoenix/commit/f0deea0054bda748f95ce19e948dff2fe0e58142">f0deea0</a>)</li>
+<li><strong>event-display,app:</strong> add explicit licence files (<a href="https://github.com/HSF/phoenix/commit/3b86cd283681cfc60238e0384fb093b48dcd58fc">3b86cd2</a>)</li>
+<li><strong>event-display:</strong> clean up XR session listener on session end (<a href="https://github.com/HSF/phoenix/issues/1000">#1000</a>) (<a href="https://github.com/HSF/phoenix/commit/b2044fc5c9bfa1349ab8292291e78ac86be8ef06">b2044fc</a>), closes <a href="https://github.com/HSF/phoenix/issues/999">#999</a></li>
+<li><strong>event-display:</strong> correct anglesAreSane docs and test argument order (<a href="https://github.com/HSF/phoenix/issues/986">#986</a>) (<a href="https://github.com/HSF/phoenix/commit/e4462d518f559d96c078cc8b1e101e05144f9038">e4462d5</a>)</li>
+<li><strong>event-display:</strong> drop pending state changes on cleanup (<a href="https://github.com/HSF/phoenix/issues/1014">#1014</a>) (<a href="https://github.com/HSF/phoenix/commit/85b4968dbd6462b36dfd2a23867cc5237cdcec27">85b4968</a>)</li>
+<li><strong>event-display:</strong> handle malformed JSON in user-loaded files (<a href="https://github.com/HSF/phoenix/issues/994">#994</a>) (<a href="https://github.com/HSF/phoenix/commit/fab6a002975a79845ae8724dd92cfcaa5c42d783">fab6a00</a>), closes <a href="https://github.com/HSF/phoenix/issues/991">#991</a></li>
+<li><strong>event-display:</strong> keep labels visible when an animation cannot run (<a href="https://github.com/HSF/phoenix/issues/1010">#1010</a>) (<a href="https://github.com/HSF/phoenix/commit/e1b880691a055970d1708b92dbb81bc54349eb45">e1b8806</a>)</li>
+<li><strong>event-display:</strong> keep loading a state after an option it names is gone (<a href="https://github.com/HSF/phoenix/issues/997">#997</a>) (<a href="https://github.com/HSF/phoenix/commit/527ab1705c0de703f6f828068fd85d4c99fef81f">527ab17</a>)</li>
+<li><strong>event-display:</strong> keep loading a zip when one JSON entry is malformed (<a href="https://github.com/HSF/phoenix/issues/1004">#1004</a>) (<a href="https://github.com/HSF/phoenix/commit/d641cf01b8677ca6bea7bf620d88af15eb885075">d641cf0</a>), closes <a href="https://github.com/HSF/phoenix/issues/994">#994</a> <a href="https://github.com/HSF/phoenix/issues/991">#991</a> <a href="https://github.com/HSF/phoenix/issues/1003">#1003</a></li>
+<li><strong>event-display:</strong> make cartesian grid work at non-default scales (<a href="https://github.com/HSF/phoenix/issues/988">#988</a>) (<a href="https://github.com/HSF/phoenix/commit/9988d88c9edccf843b414f81c7a83a3a194fc431">9988d88</a>), closes <a href="https://github.com/HSF/phoenix/issues/987">#987</a></li>
+<li><strong>event-display:</strong> stop leaking a contextmenu listener per grid shift (<a href="https://github.com/HSF/phoenix/issues/1002">#1002</a>) (<a href="https://github.com/HSF/phoenix/commit/d0633d002bdb7072917a718c5f30f26b712470ac">d0633d0</a>), closes <a href="https://github.com/HSF/phoenix/issues/1001">#1001</a></li>
+<li><strong>event-display:</strong> stop VR movement when the session ends mid-press (<a href="https://github.com/HSF/phoenix/issues/1008">#1008</a>) (<a href="https://github.com/HSF/phoenix/commit/596fe7a104a3e1b90b0614f40d0861243d99d7df">596fe7a</a>)</li>
+<li>revoke object URLs after use (<a href="https://github.com/HSF/phoenix/issues/992">#992</a>) (<a href="https://github.com/HSF/phoenix/commit/688327d82ec1602bb5926d69f349ebf860d389b5">688327d</a>), closes <a href="https://github.com/HSF/phoenix/issues/990">#990</a></li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v4.0.1...v4.1.0">4.1.0</a> (2026-09-01)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>app,event-display:</strong> removed deprecated tsconfig.json options to fix build errors (<a href="https://github.com/HSF/phoenix/commit/09d9ea92f633b0c601fd771f713debe5773daf45">09d9ea9</a>)</li>
+<li><strong>app:</strong> improvements to how collections are shown (<a href="https://github.com/HSF/phoenix/issues/972">#972</a>) (<a href="https://github.com/HSF/phoenix/commit/111adb254187b0a654b0143735595b7016916001">111adb2</a>)</li>
+<li><strong>color-manager:</strong> preserve manually-set vertex colors in Color by Vertex (<a href="https://github.com/HSF/phoenix/commit/e50ee6aa1430172f8a2bc6a9c7494f33acbc8ce3">e50ee6a</a>)</li>
+<li><strong>event-display:</strong> fix track &#39;Color by&#39; when loading JSON with linked tracks after one without (<a href="https://github.com/HSF/phoenix/issues/978">#978</a>) (<a href="https://github.com/HSF/phoenix/commit/f27eded89113ffd7b0c64eb7304a1d2b3c96f5ca">f27eded</a>)</li>
+<li><strong>event-display:</strong> make track &quot;Color by&quot; options work (<a href="https://github.com/HSF/phoenix/commit/62d129ae4f40b3ef356e4c43e27ea9f59b4b60ab">62d129a</a>), closes <a href="https://github.com/HSF/phoenix/issues/948">#948</a> <a href="https://github.com/HSF/phoenix/issues/948">#948</a></li>
+<li><strong>event-display:</strong> sync eta-phi view with 3d view visibility and cuts (<a href="https://github.com/HSF/phoenix/issues/966">#966</a>) (<a href="https://github.com/HSF/phoenix/commit/38d262c4416306379f797bdc67aa5c5177f0b801">38d262c</a>)</li>
+<li>require confirmation before replaying shared sessions, harden remote fetch (<a href="https://github.com/HSF/phoenix/issues/883">#883</a>) (<a href="https://github.com/HSF/phoenix/commit/1c60e19138e55f3176d03894d76c19cae9f19d4a">1c60e19</a>)</li>
+<li>restrict masterclass track selection to track-type collections (closes <a href="https://github.com/HSF/phoenix/issues/923">#923</a>) (<a href="https://github.com/HSF/phoenix/commit/de82cc92fe2cc16c8a84e696f7c1efd5f2250fbc">de82cc9</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>Add download preset animations with curtain loader (<a href="https://github.com/HSF/phoenix/commit/4bea4fae5bf300aa96f1d6ef674f48e83b67d1ff">4bea4fa</a>)</li>
+<li>add session recording and replay for event exploration (closes <a href="https://github.com/HSF/phoenix/issues/883">#883</a>) (<a href="https://github.com/HSF/phoenix/commit/d63994635ea3be1be65c9b93a362c1cf7465f92d">d639946</a>)</li>
+<li><strong>event-display,ui:</strong> Add a loader for ATLAS ESD/AOD files (<a href="https://github.com/HSF/phoenix/issues/975">#975</a>) (<a href="https://github.com/HSF/phoenix/commit/9654fb6891dc273e77b1a396e9e708875ebf118d">9654fb6</a>)</li>
+<li><strong>event-display:</strong> allow vertices to be linked to different track types (<a href="https://github.com/HSF/phoenix/issues/977">#977</a>) (<a href="https://github.com/HSF/phoenix/commit/ad2d08a86acc828daf962ad54bc360d2054f857a">ad2d08a</a>)</li>
+<li><strong>event-display:</strong> refactor handling of unsafe collection names (<a href="https://github.com/HSF/phoenix/commit/e6a583ccaf2738d46772949effc12427406f8899">e6a583c</a>)</li>
+<li><strong>ui:</strong> show collection options as a compact icon toolbar (<a href="https://github.com/HSF/phoenix/commit/3e937cbcedfe8ed4f7981316a904f4dc706ee9ff">3e937cb</a>)</li>
+</ul>
+<h3>Performance Improvements</h3>
+<ul>
+<li><strong>loaders:</strong> optimize PHYSLITE memory allocation and array parsing (<a href="https://github.com/HSF/phoenix/commit/6f3bf3879107c39ebf17d89de666d29ad691b0bf">6f3bf38</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v3.0.5...v4.0.0">4.0.0</a> (2026-06-06)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li>add Angular 20 compatibility by upgrading dependencies and migrating to application builder (<a href="https://github.com/HSF/phoenix/commit/a1bccdc08533d666c2ef2a81ac399ed3b78cc8c8">a1bccdc</a>), closes <a href="https://github.com/HSF/phoenix/issues/728">#728</a></li>
+<li>add unsubscribe mechanism to prevent callback memory leaks (<a href="https://github.com/HSF/phoenix/commit/9c10385cab5a7deec5e2e69e017a17ecfac15cf0">9c10385</a>)</li>
+<li>clear selections before track extension to prevent stale outlines (<a href="https://github.com/HSF/phoenix/commit/594e3e845c6c6893b8bfb0542aa5f399275aa55d">594e3e8</a>)</li>
+<li>correct stretch rendering logic, remove crop offsets, proper viewOffset and aspect handling (<a href="https://github.com/HSF/phoenix/commit/1b836b3d28c2687cb4668cb8754207bd12a6a9e1">1b836b3</a>)</li>
+<li>correct Stretch screenshot aspect ratio &amp; restore camera aspect (<a href="https://github.com/HSF/phoenix/commit/5a1662c2d59e993bb93a45a6e609d7738c8253dd">5a1662c</a>)</li>
+<li>correct viewOffset typing to resolve TS2349 error (<a href="https://github.com/HSF/phoenix/commit/07e9fc1c06d5d76e010e004b43164a8458e20ba2">07e9fc1</a>)</li>
+<li>dispose intermediate geometries after merging (<a href="https://github.com/HSF/phoenix/commit/ad79b4421bd1a798796022178fef88769e5dab45">ad79b44</a>)</li>
+<li>dispose WebGL renderers and revoke blob URLs to prevent resource leaks (<a href="https://github.com/HSF/phoenix/commit/a59b06747cdccabad6f8872c303eb5e41a3c3ae7">a59b067</a>), closes <a href="https://github.com/HSF/phoenix/issues/845">#845</a></li>
+<li>dispose WebGL resources and event listeners on cleanup (<a href="https://github.com/HSF/phoenix/commit/b7cd20090bf865887e58d6ee1a71109be3ea4dfe">b7cd200</a>)</li>
+<li><strong>effects-manager:</strong> sync selection outlines with object transforms (<a href="https://github.com/HSF/phoenix/commit/cf02404061e856b75cfc691ca2e6fdc753c18679">cf02404</a>)</li>
+<li><strong>event-display:</strong> a patch to a typo (<a href="https://github.com/HSF/phoenix/commit/90db0045a8bbd44d3b98b5b6ba5c636aa1ff62a3">90db004</a>)</li>
+<li><strong>gltf:</strong> dispose intermediate geometries after merge (<a href="https://github.com/HSF/phoenix/commit/c50d18bede95c61e8a60e8e6e2a18416c2032f45">c50d18b</a>)</li>
+<li>hide labels during animations until event objects fully appear (<a href="https://github.com/HSF/phoenix/commit/efd4e3e8756fcf63a76dca9036c2b7f92adfbd06">efd4e3e</a>)</li>
+<li><strong>import-manager:</strong> dispose intermediate geometries after GLTF merge (<a href="https://github.com/HSF/phoenix/commit/2d4fb93a34d55c7f4c6951c66a8d35d183b9f0d8">2d4fb93</a>)</li>
+<li>initialize callback functions + update Docker install step to fix CI (<a href="https://github.com/HSF/phoenix/commit/4a6d7998ce4cb4d947e2f127cd4bb737fd6b8672">4a6d799</a>)</li>
+<li>initialize callbacks + update Dockerfile base image to fix CI (<a href="https://github.com/HSF/phoenix/commit/e86b35dc4bb9d279d160f2739605fe2c9e9bf9b5">e86b35d</a>)</li>
+<li><strong>jivexml:</strong> prevent crash on missing XML tags in vertex parsing (<a href="https://github.com/HSF/phoenix/commit/2752bb849da4dde90b90926bb4a7097d998a71f7">2752bb8</a>)</li>
+<li><strong>phoenix-objects:</strong> guard against undefined track.pos (<a href="https://github.com/HSF/phoenix/commit/35d496f4f2f3bda4f145b087267836728ef99ab1">35d496f</a>)</li>
+<li>preserve main renderer during cleanup to prevent disposed-renderer reuse (<a href="https://github.com/HSF/phoenix/commit/4cdb72ac79f9874257f9267870b7d2f3ba9d83c4">4cdb72a</a>)</li>
+<li>re-apply collection cuts after event switch and clear registry on rebuild (<a href="https://github.com/HSF/phoenix/commit/4683c91b3dfe168df04dd23443d6cf79b5823bad">4683c91</a>)</li>
+<li>rename RendererManager.removeControls() to removeRenderer() (<a href="https://github.com/HSF/phoenix/issues/809">#809</a>) (<a href="https://github.com/HSF/phoenix/commit/66a7762ff9c7438eef99db115b28611c6f23538d">66a7762</a>)</li>
+<li><strong>renderer-manager:</strong> swap renderers in class state instead of local params (<a href="https://github.com/HSF/phoenix/commit/94099093c180253e2a4a9f096328d2c01af32b9f">9409909</a>), closes <a href="https://github.com/HSF/phoenix/issues/808">#808</a></li>
+<li>replace deprecated substr() with substring() in url-options-manager\n\nReplace window.location.href.substr() with substring() and add a guard\nfor missing query string to prevent incorrect behavior when the URL\nhas no &#39;?&#39; character.&quot; (<a href="https://github.com/HSF/phoenix/commit/ddbd110cc72805b424655a47e3088877819af7f6">ddbd110</a>)</li>
+<li>reset callbacks and state on view transitions (<a href="https://github.com/HSF/phoenix/commit/0c12096a59a88a20567cb12890f8a51cd7e1dae9">0c12096</a>)</li>
+<li>restore callback typings + initialize defaults + replace python with python3 in Dockerfile (<a href="https://github.com/HSF/phoenix/commit/0c41d485411ed0f297ade85e69a180948fa1e6a2">0c41d48</a>)</li>
+<li>restore crop/stretch logic + integrate tiling safely (<a href="https://github.com/HSF/phoenix/commit/cc8b76445bcc95a7c5b274a7646d437178683e07">cc8b764</a>)</li>
+<li>restore stretch aspect logic + safe TS guards (<a href="https://github.com/HSF/phoenix/commit/5eddf2d90695d022ad22ccc241bb6036c07f1ce1">5eddf2d</a>)</li>
+<li>revert rainbow selection to amber glow, improve jet and selection UX (<a href="https://github.com/HSF/phoenix/issues/839">#839</a>) (<a href="https://github.com/HSF/phoenix/commit/0f6da97424adb839019ff0bfcfb56ee85c2da018">0f6da97</a>)</li>
+<li>safe camera view offset calls (<a href="https://github.com/HSF/phoenix/commit/e06a9c2facc952facf9398e87c78366dbb0366c1">e06a9c2</a>)</li>
+<li><strong>scene-manager:</strong> dispose GPU resources on event switch (<a href="https://github.com/HSF/phoenix/commit/ae6df4a1a28eef1fe179f8604cb894395f0e5df7">ae6df4a</a>)</li>
+<li><strong>selection-manager:</strong> prevent duplicate event listeners on re-init (<a href="https://github.com/HSF/phoenix/commit/cb9daecbc62929a8c15cc32cf9e64ddef7fc09bd">cb9daec</a>)</li>
+<li><strong>three-manager:</strong> clear selections on event switch to prevent memory leak (<a href="https://github.com/HSF/phoenix/commit/1335d579228b47897c0624df99bd88df599de920">1335d57</a>)</li>
+<li><strong>three-manager:</strong> complete event listener cleanup on re-init (<a href="https://github.com/HSF/phoenix/commit/a72f27bb748320148b8e9973728e9e54cba5594f">a72f27b</a>)</li>
+<li>upgrade tween.js to v25 with explicit group management (<a href="https://github.com/HSF/phoenix/commit/acec46ce0829545db1251f8238f4d4dc4a265622">acec46c</a>), closes <a href="https://github.com/HSF/phoenix/issues/680">#680</a></li>
+<li>upgrade TypeScript to 5.7 with Jest ESM mocks (<a href="https://github.com/HSF/phoenix/commit/7969ece4ff3a169bb27f6cac0cb51b1188b54dfe">7969ece</a>)</li>
+<li>use InstancedMesh for CaloCells to prevent WebGL crash (<a href="https://github.com/HSF/phoenix/issues/474">#474</a>) Signed-off-by: rx18-eng <a href="mailto:remopanda78@gmail.com">remopanda78@gmail.com</a> (<a href="https://github.com/HSF/phoenix/commit/766d3ba8fbd7924cc0be0c70c7495d5a52d5e85e">766d3ba</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>add eta-phi energy map panel (<a href="https://github.com/HSF/phoenix/commit/012fb8d7a218aacc2d499d3ca4da06c7fd9e79ae">012fb8d</a>)</li>
+<li>add event dataset browser with physics-aware filtering (<a href="https://github.com/HSF/phoenix/issues/861">#861</a>) (<a href="https://github.com/HSF/phoenix/commit/28a8995a653579846efd50342952ff7e414d4a48">28a8995</a>)</li>
+<li>add masterclass panel and ATLAS masterclass landing page (closes <a href="https://github.com/HSF/phoenix/issues/835">#835</a>, closes <a href="https://github.com/HSF/phoenix/issues/915">#915</a>) (<a href="https://github.com/HSF/phoenix/commit/8a6784c649e1677bdb58cf12e750488f5fd2dfbb">8a6784c</a>)</li>
+<li>add per-collection track extension to radius (<a href="https://github.com/HSF/phoenix/issues/177">#177</a>) (<a href="https://github.com/HSF/phoenix/commit/2983295225d25b7e3e1af448cd584f09f2dee21b">2983295</a>)</li>
+<li>add PHYSLITE ROOT file loader for ATLAS Open Data (<a href="https://github.com/HSF/phoenix/issues/823">#823</a>) (<a href="https://github.com/HSF/phoenix/commit/d9ff993fb74309cb28d87f8dd47b8d7d23615ce4">d9ff993</a>)</li>
+<li>add tiled screenshot rendering to support very large images (<a href="https://github.com/HSF/phoenix/issues/581">#581</a>) (<a href="https://github.com/HSF/phoenix/commit/67d522dbc1900d01787d9b9afbf62f85d9d51ce4">67d522d</a>)</li>
+<li>add track kinematics panel with config-driven columns (<a href="https://github.com/HSF/phoenix/commit/846edcab55e0d88cd356c2c3568486d51de2b282">846edca</a>)</li>
+<li>add typed event data pipeline with loader registry (<a href="https://github.com/HSF/phoenix/commit/901707ac8c233f1f0a8159b927627c8ae5d0079d">901707a</a>)</li>
+<li>add URL deep linking with full view state sharing (<a href="https://github.com/HSF/phoenix/commit/4124325e3fbdff737a5394802d1b0ca6469f75f9">4124325</a>)</li>
+<li><strong>effects-manager:</strong> add EffectsState enum and setHoverColor() (<a href="https://github.com/HSF/phoenix/issues/886">#886</a>) (<a href="https://github.com/HSF/phoenix/commit/eabcdbfd0d27ed3c3d17649c5d5880191ccfe67e">eabcdbf</a>)</li>
+<li><strong>event-display:</strong> implement performant rainbow selection system with multi-object support (<a href="https://github.com/HSF/phoenix/commit/bfa2705610ab081e68a1f3a8b5ba3bdb1a32620f">bfa2705</a>)</li>
+<li><strong>event-display:</strong> implement rainbow outline selection system with EdgesGeometry (<a href="https://github.com/HSF/phoenix/commit/6bb0256f772fbcc2d57add191e6f422cb06f283c">6bb0256</a>)</li>
+<li><strong>event-display:</strong> migrate to controls-based architecture with dual canvas support (<a href="https://github.com/HSF/phoenix/commit/b045001c71dd7c640ae772e94c2ab5daf79abcb5">b045001</a>)</li>
+<li><strong>state-manager:</strong> serialize cut state to JSON and restore via Load State (<a href="https://github.com/HSF/phoenix/commit/092814b35c88d532007c423680dca9df68c7904f">092814b</a>), closes <a href="https://github.com/HSF/phoenix/issues/872">#872</a> <a href="https://github.com/HSF/phoenix/issues/863">#863</a></li>
+<li>support per-track linewidth in TracksMesh (<a href="https://github.com/HSF/phoenix/commit/4c7d7118898426509d5fbf7ead7a4bfd1bc1d1f6">4c7d711</a>)</li>
+</ul>
+<h3>Reverts</h3>
+<ul>
+<li>Revert &quot;chore: apply prettier and eslint fixes&quot; (<a href="https://github.com/HSF/phoenix/commit/8904c1cfcd829df43e2c3b6ab9494ce9f153d016">8904c1c</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v3.0.5...v3.0.6">3.0.6</a> (2026-05-28)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li>add Angular 20 compatibility by upgrading dependencies and migrating to application builder (<a href="https://github.com/HSF/phoenix/commit/a1bccdc08533d666c2ef2a81ac399ed3b78cc8c8">a1bccdc</a>), closes <a href="https://github.com/HSF/phoenix/issues/728">#728</a></li>
+<li>add unsubscribe mechanism to prevent callback memory leaks (<a href="https://github.com/HSF/phoenix/commit/9c10385cab5a7deec5e2e69e017a17ecfac15cf0">9c10385</a>)</li>
+<li>clear selections before track extension to prevent stale outlines (<a href="https://github.com/HSF/phoenix/commit/594e3e845c6c6893b8bfb0542aa5f399275aa55d">594e3e8</a>)</li>
+<li>correct stretch rendering logic, remove crop offsets, proper viewOffset and aspect handling (<a href="https://github.com/HSF/phoenix/commit/1b836b3d28c2687cb4668cb8754207bd12a6a9e1">1b836b3</a>)</li>
+<li>correct Stretch screenshot aspect ratio &amp; restore camera aspect (<a href="https://github.com/HSF/phoenix/commit/5a1662c2d59e993bb93a45a6e609d7738c8253dd">5a1662c</a>)</li>
+<li>correct viewOffset typing to resolve TS2349 error (<a href="https://github.com/HSF/phoenix/commit/07e9fc1c06d5d76e010e004b43164a8458e20ba2">07e9fc1</a>)</li>
+<li>dispose intermediate geometries after merging (<a href="https://github.com/HSF/phoenix/commit/ad79b4421bd1a798796022178fef88769e5dab45">ad79b44</a>)</li>
+<li>dispose WebGL renderers and revoke blob URLs to prevent resource leaks (<a href="https://github.com/HSF/phoenix/commit/a59b06747cdccabad6f8872c303eb5e41a3c3ae7">a59b067</a>), closes <a href="https://github.com/HSF/phoenix/issues/845">#845</a></li>
+<li>dispose WebGL resources and event listeners on cleanup (<a href="https://github.com/HSF/phoenix/commit/b7cd20090bf865887e58d6ee1a71109be3ea4dfe">b7cd200</a>)</li>
+<li><strong>effects-manager:</strong> sync selection outlines with object transforms (<a href="https://github.com/HSF/phoenix/commit/cf02404061e856b75cfc691ca2e6fdc753c18679">cf02404</a>)</li>
+<li><strong>event-display:</strong> a patch to a typo (<a href="https://github.com/HSF/phoenix/commit/90db0045a8bbd44d3b98b5b6ba5c636aa1ff62a3">90db004</a>)</li>
+<li><strong>gltf:</strong> dispose intermediate geometries after merge (<a href="https://github.com/HSF/phoenix/commit/c50d18bede95c61e8a60e8e6e2a18416c2032f45">c50d18b</a>)</li>
+<li>hide labels during animations until event objects fully appear (<a href="https://github.com/HSF/phoenix/commit/efd4e3e8756fcf63a76dca9036c2b7f92adfbd06">efd4e3e</a>)</li>
+<li><strong>import-manager:</strong> dispose intermediate geometries after GLTF merge (<a href="https://github.com/HSF/phoenix/commit/2d4fb93a34d55c7f4c6951c66a8d35d183b9f0d8">2d4fb93</a>)</li>
+<li>initialize callback functions + update Docker install step to fix CI (<a href="https://github.com/HSF/phoenix/commit/4a6d7998ce4cb4d947e2f127cd4bb737fd6b8672">4a6d799</a>)</li>
+<li>initialize callbacks + update Dockerfile base image to fix CI (<a href="https://github.com/HSF/phoenix/commit/e86b35dc4bb9d279d160f2739605fe2c9e9bf9b5">e86b35d</a>)</li>
+<li><strong>jivexml:</strong> prevent crash on missing XML tags in vertex parsing (<a href="https://github.com/HSF/phoenix/commit/2752bb849da4dde90b90926bb4a7097d998a71f7">2752bb8</a>)</li>
+<li><strong>phoenix-objects:</strong> guard against undefined track.pos (<a href="https://github.com/HSF/phoenix/commit/35d496f4f2f3bda4f145b087267836728ef99ab1">35d496f</a>)</li>
+<li>preserve main renderer during cleanup to prevent disposed-renderer reuse (<a href="https://github.com/HSF/phoenix/commit/4cdb72ac79f9874257f9267870b7d2f3ba9d83c4">4cdb72a</a>)</li>
+<li>re-apply collection cuts after event switch and clear registry on rebuild (<a href="https://github.com/HSF/phoenix/commit/4683c91b3dfe168df04dd23443d6cf79b5823bad">4683c91</a>)</li>
+<li>rename RendererManager.removeControls() to removeRenderer() (<a href="https://github.com/HSF/phoenix/issues/809">#809</a>) (<a href="https://github.com/HSF/phoenix/commit/66a7762ff9c7438eef99db115b28611c6f23538d">66a7762</a>)</li>
+<li><strong>renderer-manager:</strong> swap renderers in class state instead of local params (<a href="https://github.com/HSF/phoenix/commit/94099093c180253e2a4a9f096328d2c01af32b9f">9409909</a>), closes <a href="https://github.com/HSF/phoenix/issues/808">#808</a></li>
+<li>replace deprecated substr() with substring() in url-options-manager\n\nReplace window.location.href.substr() with substring() and add a guard\nfor missing query string to prevent incorrect behavior when the URL\nhas no &#39;?&#39; character.&quot; (<a href="https://github.com/HSF/phoenix/commit/ddbd110cc72805b424655a47e3088877819af7f6">ddbd110</a>)</li>
+<li>reset callbacks and state on view transitions (<a href="https://github.com/HSF/phoenix/commit/0c12096a59a88a20567cb12890f8a51cd7e1dae9">0c12096</a>)</li>
+<li>restore callback typings + initialize defaults + replace python with python3 in Dockerfile (<a href="https://github.com/HSF/phoenix/commit/0c41d485411ed0f297ade85e69a180948fa1e6a2">0c41d48</a>)</li>
+<li>restore crop/stretch logic + integrate tiling safely (<a href="https://github.com/HSF/phoenix/commit/cc8b76445bcc95a7c5b274a7646d437178683e07">cc8b764</a>)</li>
+<li>restore stretch aspect logic + safe TS guards (<a href="https://github.com/HSF/phoenix/commit/5eddf2d90695d022ad22ccc241bb6036c07f1ce1">5eddf2d</a>)</li>
+<li>revert rainbow selection to amber glow, improve jet and selection UX (<a href="https://github.com/HSF/phoenix/issues/839">#839</a>) (<a href="https://github.com/HSF/phoenix/commit/0f6da97424adb839019ff0bfcfb56ee85c2da018">0f6da97</a>)</li>
+<li>safe camera view offset calls (<a href="https://github.com/HSF/phoenix/commit/e06a9c2facc952facf9398e87c78366dbb0366c1">e06a9c2</a>)</li>
+<li><strong>scene-manager:</strong> dispose GPU resources on event switch (<a href="https://github.com/HSF/phoenix/commit/ae6df4a1a28eef1fe179f8604cb894395f0e5df7">ae6df4a</a>)</li>
+<li><strong>selection-manager:</strong> prevent duplicate event listeners on re-init (<a href="https://github.com/HSF/phoenix/commit/cb9daecbc62929a8c15cc32cf9e64ddef7fc09bd">cb9daec</a>)</li>
+<li><strong>three-manager:</strong> clear selections on event switch to prevent memory leak (<a href="https://github.com/HSF/phoenix/commit/1335d579228b47897c0624df99bd88df599de920">1335d57</a>)</li>
+<li><strong>three-manager:</strong> complete event listener cleanup on re-init (<a href="https://github.com/HSF/phoenix/commit/a72f27bb748320148b8e9973728e9e54cba5594f">a72f27b</a>)</li>
+<li>upgrade tween.js to v25 with explicit group management (<a href="https://github.com/HSF/phoenix/commit/acec46ce0829545db1251f8238f4d4dc4a265622">acec46c</a>), closes <a href="https://github.com/HSF/phoenix/issues/680">#680</a></li>
+<li>upgrade TypeScript to 5.7 with Jest ESM mocks (<a href="https://github.com/HSF/phoenix/commit/7969ece4ff3a169bb27f6cac0cb51b1188b54dfe">7969ece</a>)</li>
+<li>use InstancedMesh for CaloCells to prevent WebGL crash (<a href="https://github.com/HSF/phoenix/issues/474">#474</a>) Signed-off-by: rx18-eng <a href="mailto:remopanda78@gmail.com">remopanda78@gmail.com</a> (<a href="https://github.com/HSF/phoenix/commit/766d3ba8fbd7924cc0be0c70c7495d5a52d5e85e">766d3ba</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>add eta-phi energy map panel (<a href="https://github.com/HSF/phoenix/commit/012fb8d7a218aacc2d499d3ca4da06c7fd9e79ae">012fb8d</a>)</li>
+<li>add event dataset browser with physics-aware filtering (<a href="https://github.com/HSF/phoenix/issues/861">#861</a>) (<a href="https://github.com/HSF/phoenix/commit/28a8995a653579846efd50342952ff7e414d4a48">28a8995</a>)</li>
+<li>add per-collection track extension to radius (<a href="https://github.com/HSF/phoenix/issues/177">#177</a>) (<a href="https://github.com/HSF/phoenix/commit/2983295225d25b7e3e1af448cd584f09f2dee21b">2983295</a>)</li>
+<li>add PHYSLITE ROOT file loader for ATLAS Open Data (<a href="https://github.com/HSF/phoenix/issues/823">#823</a>) (<a href="https://github.com/HSF/phoenix/commit/d9ff993fb74309cb28d87f8dd47b8d7d23615ce4">d9ff993</a>)</li>
+<li>add tiled screenshot rendering to support very large images (<a href="https://github.com/HSF/phoenix/issues/581">#581</a>) (<a href="https://github.com/HSF/phoenix/commit/67d522dbc1900d01787d9b9afbf62f85d9d51ce4">67d522d</a>)</li>
+<li>add typed event data pipeline with loader registry (<a href="https://github.com/HSF/phoenix/commit/901707ac8c233f1f0a8159b927627c8ae5d0079d">901707a</a>)</li>
+<li>add URL deep linking with full view state sharing (<a href="https://github.com/HSF/phoenix/commit/4124325e3fbdff737a5394802d1b0ca6469f75f9">4124325</a>)</li>
+<li><strong>effects-manager:</strong> add EffectsState enum and setHoverColor() (<a href="https://github.com/HSF/phoenix/issues/886">#886</a>) (<a href="https://github.com/HSF/phoenix/commit/eabcdbfd0d27ed3c3d17649c5d5880191ccfe67e">eabcdbf</a>)</li>
+<li><strong>event-display:</strong> implement performant rainbow selection system with multi-object support (<a href="https://github.com/HSF/phoenix/commit/bfa2705610ab081e68a1f3a8b5ba3bdb1a32620f">bfa2705</a>)</li>
+<li><strong>event-display:</strong> implement rainbow outline selection system with EdgesGeometry (<a href="https://github.com/HSF/phoenix/commit/6bb0256f772fbcc2d57add191e6f422cb06f283c">6bb0256</a>)</li>
+<li><strong>event-display:</strong> migrate to controls-based architecture with dual canvas support (<a href="https://github.com/HSF/phoenix/commit/b045001c71dd7c640ae772e94c2ab5daf79abcb5">b045001</a>)</li>
+<li><strong>state-manager:</strong> serialize cut state to JSON and restore via Load State (<a href="https://github.com/HSF/phoenix/commit/092814b35c88d532007c423680dca9df68c7904f">092814b</a>), closes <a href="https://github.com/HSF/phoenix/issues/872">#872</a> <a href="https://github.com/HSF/phoenix/issues/863">#863</a></li>
+<li>support per-track linewidth in TracksMesh (<a href="https://github.com/HSF/phoenix/commit/4c7d7118898426509d5fbf7ead7a4bfd1bc1d1f6">4c7d711</a>)</li>
+</ul>
+<h3>Reverts</h3>
+<ul>
+<li>Revert &quot;chore: apply prettier and eslint fixes&quot; (<a href="https://github.com/HSF/phoenix/commit/8904c1cfcd829df43e2c3b6ab9494ce9f153d016">8904c1c</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v3.0.4...v3.0.5">3.0.5</a> (2024-11-30)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h2>3.0.4 (2024-11-29)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h2><a href="https://github.com/HSF/phoenix/compare/v3.0.2...v3.0.3">3.0.3</a> (2024-11-22)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h2><a href="https://github.com/HSF/phoenix/compare/v3.0.1...v3.0.2">3.0.2</a> (2024-11-22)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.17.0...v3.0.1">3.0.1</a> (2024-11-22)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1>3.0.0 (2024-11-21)</h1>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1>2.17.0 (2024-11-21)</h1>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1>2.16.0 (2024-03-24)</h1>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h2>2.15.1 (2024-03-22)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.14.1...v2.15.0">2.15.0</a> (2024-03-21)</h1>
+<h3>Reverts</h3>
+<ul>
+<li>Revert &quot;chore(release): v2.15.0&quot; (<a href="https://github.com/HSF/phoenix/commit/8f018e7c11284d3dfd4290f84e87949b8ac2e9d7">8f018e7</a>)</li>
+</ul>
+<h2>2.14.1 (2023-05-14)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li>configure git when trying to release (<a href="https://github.com/HSF/phoenix/commit/fc4ae96efdb5ce47db09c0e026fce4561a42ec24">fc4ae96</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.13.0...v2.14.0">2.14.0</a> (2023-03-22)</h1>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.12.0...v2.13.0">2.13.0</a> (2023-03-02)</h1>
+<h3>Reverts</h3>
+<ul>
+<li>Revert &quot;Updated versions to try to reduce yarn warnings&quot; (<a href="https://github.com/HSF/phoenix/commit/477845f916b9da939a8fbe8c3eb7278684255813">477845f</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.11.4...v2.12.0">2.12.0</a> (2023-01-13)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> allowing geometry name to be undefined (<a href="https://github.com/HSF/phoenix/commit/9ffb5e2cfab7066c69e2f8fa9f058f15a5160b7c">9ffb5e2</a>)</li>
+<li><strong>event-display:</strong> make side and length optional in calo cell params (<a href="https://github.com/HSF/phoenix/commit/448eb4fafc722f2c6c1febad69c7a5ce047a963e">448eb4f</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>event-display:</strong> adding side and length variables for the calo cell/cluster (<a href="https://github.com/HSF/phoenix/commit/29beae782b0c86aaf55fb266f924ea49d23f7365">29beae7</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.11.3...v2.11.4">2.11.4</a> (2022-10-27)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> An argument for &#39;camera&#39; was not provided (<a href="https://github.com/HSF/phoenix/commit/dcb4c8844342cd997d7bd7ba7f9d1d316eb0b602">dcb4c88</a>)</li>
+<li>linting (<a href="https://github.com/HSF/phoenix/commit/f97e6151a14dd9c9bee6af5c11222cc83b573d57">f97e615</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.11.0...v2.11.2">2.11.2</a> (2022-10-03)</h2>
+<h3>Reverts</h3>
+<ul>
+<li>Revert &quot;Simple angular 14 fix&quot; (<a href="https://github.com/HSF/phoenix/commit/f40beac4947bdff5bb2e7543756f057c31761f30">f40beac</a>)</li>
+<li>Revert &quot;Improve scripts after removing phoenix-event-display from phoenix-ng &#39;paths&#39;&quot; (<a href="https://github.com/HSF/phoenix/commit/24ecd773dd0a362f02b3bb924b637ae9cee8e7f8">24ecd77</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.11.0...v2.11.1">2.11.1</a> (2022-09-29)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.10.0...v2.11.0">2.11.0</a> (2022-09-13)</h1>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add e2e tests for phoenix app (<a href="https://github.com/HSF/phoenix/commit/69544e6eca5c98a222eb2dcbf9f93593ccd54f20">69544e6</a>)</li>
+<li><strong>event-display:</strong> add root geometry loading to loading manager (<a href="https://github.com/HSF/phoenix/commit/6c92e33c0a0e7f516462ab05d7c0e07e89d4ee82">6c92e33</a>)</li>
+<li><strong>event-display:</strong> load root geometry in io options correctly (<a href="https://github.com/HSF/phoenix/commit/ff77aaa0c938e83f9075072bd2f5d5a66def5e7d">ff77aaa</a>)</li>
+<li><strong>event-display:</strong> remove loadJSRootScripts function from script loader (<a href="https://github.com/HSF/phoenix/commit/e1529336edc0e1a5f6718129a0881618e5c00ecc">e152933</a>)</li>
+<li><strong>event-display:</strong> update jsroot usage in JSRootEventLoader (<a href="https://github.com/HSF/phoenix/commit/4791f5360050944c82a1cf6ebbf921d6b969008a">4791f53</a>)</li>
+<li><strong>event-display:</strong> use full path for object names to make them unique (<a href="https://github.com/HSF/phoenix/commit/3d1f91c6a1b9940be3d8971626a885229178083f">3d1f91c</a>)</li>
+<li><strong>event-display:</strong> use jsroot 7 to load root json geometry (<a href="https://github.com/HSF/phoenix/commit/5518a3ececb50fdb5a346c9b2999a43249d16dac">5518a3e</a>)</li>
+<li><strong>event-display:</strong> use url inside of objects for loading jsroot geometries (<a href="https://github.com/HSF/phoenix/commit/a54d302e321cd064e62dc5e05136727e6a8dfd9b">a54d302</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.9.0...v2.10.0">2.10.0</a> (2022-07-21)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> fixed handling of event properties (<a href="https://github.com/HSF/phoenix/commit/6ace2f6b457ed79f1a2ed5f363e686d1a593839e">6ace2f6</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.8.0...v2.9.0">2.9.0</a> (2022-06-17)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> fix clipping angle not being applied from menu config (<a href="https://github.com/HSF/phoenix/commit/62bf178263d0aa278c2570ad6a209da28c207c5b">62bf178</a>)</li>
+<li><strong>event-display:</strong> fix geometry not being loaded correctly in menu (<a href="https://github.com/HSF/phoenix/commit/7e0870b3577f8e2e2a72797755e58d838be67eb7">7e0870b</a>)</li>
+<li><strong>event-display:</strong> fix opacity not being set for LHCb geometry (<a href="https://github.com/HSF/phoenix/commit/65e657be19836a2aac6eb5c879529fd84f0bb2b7">65e657b</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add component to periodically cycle through events (<a href="https://github.com/HSF/phoenix/commit/05ae1d6db8892d4504d3f5532cb165b31663bcc8">05ae1d6</a>)</li>
+<li>update all packages (<a href="https://github.com/HSF/phoenix/commit/9276ef92ce52e24f7492aabd51831c07ddef0673">9276ef9</a>)</li>
+<li><strong>app:</strong> make sure all volumes are transparent in LHCb (<a href="https://github.com/HSF/phoenix/commit/7e364625af06af3cc2a965fc2500bc4faedc73cb">7e36462</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.7.0...v2.8.0">2.8.0</a> (2022-05-16)</h1>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.6.0...v2.7.0">2.7.0</a> (2022-04-05)</h1>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add object clipping for upper and lower geometry (<a href="https://github.com/HSF/phoenix/commit/1788560fb3f6a3e2e0862cd7ca12c31779a0c3da">1788560</a>)</li>
+<li><strong>app:</strong> add start clipping angle and opening angle for object clipping (<a href="https://github.com/HSF/phoenix/commit/9bc48e0d00e0710cfc58fe3ce3a2f16dd8efc1ca">9bc48e0</a>)</li>
+<li><strong>app:</strong> add start clipping angle and opening angle for object clipping (<a href="https://github.com/HSF/phoenix/commit/12b1754161db803abdf74afcd4d75732f8905503">12b1754</a>)</li>
+<li><strong>app:</strong> add start clipping angle and opening angle for object clipping (<a href="https://github.com/HSF/phoenix/commit/4c5fac913baac2acad09e930274135eea5786a0b">4c5fac9</a>)</li>
+<li><strong>app:</strong> add start clipping angle and opening angle for object clipping (<a href="https://github.com/HSF/phoenix/commit/a8336ae568613aa5cc1afc07bf0be5c157940ac2">a8336ae</a>)</li>
+<li><strong>app:</strong> add start clipping angle and opening angle for object clipping (<a href="https://github.com/HSF/phoenix/commit/3255a65a8aa04d6f1a58b7724a10032cdd071e7e">3255a65</a>)</li>
+<li><strong>event-display:</strong> add &#39;start&#39; clipping angle as well as opening angle (<a href="https://github.com/HSF/phoenix/commit/d2c02d5255a0aa6d9c47e5ad625da3ee81a837c4">d2c02d5</a>)</li>
+<li><strong>event-display:</strong> add docs to phoenix ui implementations (<a href="https://github.com/HSF/phoenix/commit/0c48b27ddf78700d939fe34f15ad065e3acb811f">0c48b27</a>)</li>
+<li><strong>event-display:</strong> add function to get event data type folder of each menu (<a href="https://github.com/HSF/phoenix/commit/c91aa0e41532281443200e22f92f0754f4bb3296">c91aa0e</a>)</li>
+<li><strong>event-display:</strong> add interface for Phoenix UI (<a href="https://github.com/HSF/phoenix/commit/aaed8f50fee8fb2ce1661fd68ed1b25cde9df9e3">aaed8f5</a>)</li>
+<li><strong>event-display:</strong> implement phoenix-ui interface for phoenix menu (<a href="https://github.com/HSF/phoenix/commit/d4866ea58a1bac188682d401a56ec1eaf6af72a0">d4866ea</a>)</li>
+<li><strong>event-display:</strong> implement PhoenixUI interface for dat.GUI menu (<a href="https://github.com/HSF/phoenix/commit/a4e8aaaa804973e3175bdca1d4e86ae833d21df8">a4e8aaa</a>)</li>
+<li><strong>event-display:</strong> update calls to ui-manager (<a href="https://github.com/HSF/phoenix/commit/473a39c489a8aa512bac810912ee6fa4b7bfd34b">473a39c</a>)</li>
+<li><strong>event-display:</strong> update phoenix loader UI manager for PhoenixUI interface (<a href="https://github.com/HSF/phoenix/commit/f2376cc8bbb9247e6598c82acab57501c5a04f80">f2376cc</a>)</li>
+<li><strong>event-display:</strong> use generic menus in ui-manager (<a href="https://github.com/HSF/phoenix/commit/7a42b659f6be3c57e22d9be834fb19caa00661c1">7a42b65</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.5.2...v2.6.0">2.6.0</a> (2022-02-28)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>app:</strong> fix types in templates (<a href="https://github.com/HSF/phoenix/commit/545c95681093f25e7e9ea026c66fdfe91e25ec4f">545c956</a>)</li>
+<li><strong>app:</strong> use workaround for phoenix menu config types in templates (<a href="https://github.com/HSF/phoenix/commit/9d109e5e26a863951f82a93a4c610a9fd19e90c5">9d109e5</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>update packages (<a href="https://github.com/HSF/phoenix/commit/f2ed0a366520c597349403a8648d384d907da0f6">f2ed0a3</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.6.0-alpha...v2.5.2">2.5.2</a> (2022-01-15)</h2>
+<p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.4.0...v2.5.0">2.5.0</a> (2021-12-20)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> fix jets disappearing on scaling to 0 (<a href="https://github.com/HSF/phoenix/commit/14cdc8f49bac8482d607614d59e6391879a90e90">14cdc8f</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>update packages (<a href="https://github.com/HSF/phoenix/commit/26444f15aba104f86357670f0e54e255dcf85123">26444f1</a>)</li>
+<li><strong>event-display:</strong> externalize three.js dependency in webpack bundle (<a href="https://github.com/HSF/phoenix/commit/6a7e82f0fb174e126b854818237eff7c1753abde">6a7e82f</a>)</li>
+<li><strong>event-display:</strong> improve JiveXML loader (<a href="https://github.com/HSF/phoenix/commit/34a783c0bfbc68f57abbb68e50fb9dc9e0cf1d40">34a783c</a>), closes <a href="https://github.com/HSF/phoenix/issues/364">#364</a></li>
+<li><strong>event-display:</strong> simplify phoenix menu node types (<a href="https://github.com/HSF/phoenix/commit/c60b3c18f79d0274c05dbf68f1b92c9a79d4b209">c60b3c1</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.3.2...v2.4.0">2.4.0</a> (2021-10-28)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> handle AR and VR permission errors (<a href="https://github.com/HSF/phoenix/commit/dfbc6a2e97236408bcaa808221ca837576a1b6c5">dfbc6a2</a>)</li>
+<li><strong>event-display:</strong> update three.js imports (<a href="https://github.com/HSF/phoenix/commit/4e41f72491486e68166251d98c45417dc63d1a8b">4e41f72</a>)</li>
+<li><strong>event-display:</strong> use proper error handling for local storage (<a href="https://github.com/HSF/phoenix/commit/55cad7c9721d2949dd17ec4055946dbcd669179e">55cad7c</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>update all packages (<a href="https://github.com/HSF/phoenix/commit/c0af4975040881e6151cc2af36a2ea89da1938d8">c0af497</a>)</li>
+<li><strong>event-display:</strong> remove labels on event load (<a href="https://github.com/HSF/phoenix/commit/75f829a6d8aa630b1573ec9dc739cbe7e82c9fdc">75f829a</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.3.1...v2.3.2">2.3.2</a> (2021-09-28)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> remove XRSessionInit type from xr-manager (<a href="https://github.com/HSF/phoenix/commit/608f5295d1ec8de5fb8d7da3be511748e642d040">608f529</a>)</li>
+</ul>
+<h2><a href="https://github.com/HSF/phoenix/compare/v2.3.0...v2.3.1">2.3.1</a> (2021-09-28)</h2>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> add @types/three package as a dev dependency (<a href="https://github.com/HSF/phoenix/commit/10244f7da66782027636df00fbfd5383befb1668">10244f7</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>event-display:</strong> function to get url options from url options manager (<a href="https://github.com/HSF/phoenix/commit/0ba509786be4cc23fb702a8fe940b09e2f278de6">0ba5097</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.2.0...v2.3.0">2.3.0</a> (2021-09-20)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> do not apply Phoenix menu node toggle if undefined in config (<a href="https://github.com/HSF/phoenix/commit/bf98a246d9808834b902b9b447d5e7f597eba6d2">bf98a24</a>)</li>
+<li><strong>event-display:</strong> fix cuts not displaying for tracks in collections info (<a href="https://github.com/HSF/phoenix/commit/14d5f3a62384dccb63e69aea9de568227db0545c">14d5f3a</a>)</li>
+<li><strong>event-display:</strong> fix error in adding labels for electrons (<a href="https://github.com/HSF/phoenix/commit/98c70552ffb996957070cb2fa8119fc75d0864d3">98c7055</a>)</li>
+<li><strong>event-display:</strong> fix opacity for tracks (<a href="https://github.com/HSF/phoenix/commit/094261c61ef9f7715c09530e907aa6913290a648">094261c</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li>Upgrade all packages (<a href="https://github.com/HSF/phoenix/commit/4698ea4ed623c579e0720fd9d2a0dbdb16985181">4698ea4</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.1.0...v2.2.0">2.2.0</a> (2021-08-03)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> fix AR not working in playground (<a href="https://github.com/HSF/phoenix/commit/7f35fdbf2a1907cd8f23114f2725360c9823c9a2">7f35fdb</a>)</li>
+<li><strong>event-display:</strong> fix bug in jive xml loader (<a href="https://github.com/HSF/phoenix/commit/39241a4a1e074e3e3c3e5b5b5a04e0dd61f8fc4c">39241a4</a>)</li>
+<li><strong>event-display:</strong> fix collection color not working with load state (<a href="https://github.com/HSF/phoenix/commit/4603dbcf18606da62e1a1649b5b1ea9b0505ea2d">4603dbc</a>)</li>
+<li><strong>event-display:</strong> fix load state throwing error (<a href="https://github.com/HSF/phoenix/commit/16ea0df2805d2b8517fa395008b0de0f6be40c39">16ea0df</a>)</li>
+<li><strong>event-display:</strong> fix tests (<a href="https://github.com/HSF/phoenix/commit/7e9c733a691ee6e66f5fd16cc120d46b4a44aa85">7e9c733</a>)</li>
+<li><strong>event-display:</strong> increase max cut value for jets (<a href="https://github.com/HSF/phoenix/commit/9f4cf7cf0f59744293b6714c447152defeb4c6ea">9f4cf7c</a>), closes <a href="https://github.com/HSF/phoenix/issues/336">#336</a></li>
+<li><strong>event-display:</strong> use coneR, if available, to determine jet width (<a href="https://github.com/HSF/phoenix/commit/d4b62c218b24f40da787648175cb790ad62bcc54">d4b62c2</a>)</li>
+<li>Fix linting issues and update code (<a href="https://github.com/HSF/phoenix/commit/dc7d74a9bedb86a27fdd8a5326108e20274eafbd">dc7d74a</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>event-display:</strong> add option to scale vertices (<a href="https://github.com/HSF/phoenix/commit/08c8e00a2297adf6e5e36fbbd1096ea7e7ac8660">08c8e00</a>)</li>
+<li><strong>event-display:</strong> improve handling of scale option and add it for vertices (<a href="https://github.com/HSF/phoenix/commit/34d9b2c70f9e2b4cd2df16663c73aa8992a78dc4">34d9b2c</a>)</li>
+<li>update all packages including Angular (<a href="https://github.com/HSF/phoenix/commit/9a883317c910e928ef9164b9f5495972426b0494">9a88331</a>)</li>
+<li>update packages except Angular (<a href="https://github.com/HSF/phoenix/commit/26eff0ee71bbaed9afa484bfddeaa695044fc447">26eff0e</a>)</li>
+<li>upgrade all packages (<a href="https://github.com/HSF/phoenix/commit/36486b8523ac35a6f9565bba6ffc11252ccb40e6">36486b8</a>)</li>
+<li><strong>app:</strong> option to start AR with or without DOM overlay (<a href="https://github.com/HSF/phoenix/commit/9a6c24311621eaed644da582876345cee04415b0">9a6c243</a>)</li>
+<li><strong>event-display:</strong> JiveXML, load coneR (set default if missing). (<a href="https://github.com/HSF/phoenix/commit/867d28a0f98d6a6cf3a4f93289e845452d98bce6">867d28a</a>)</li>
+<li><strong>event-display:</strong> make background transparent in AR mode (<a href="https://github.com/HSF/phoenix/commit/46b8aee4b277dbbce01251c7182c6b8cb081bc50">46b8aee</a>)</li>
+<li><strong>event-display:</strong> use dom overlay for AR (<a href="https://github.com/HSF/phoenix/commit/c897ab331d1b5481ac6c4951040f2eb303800e13">c897ab3</a>)</li>
+<li><strong>event-display:</strong> use DOM overlay for AR (<a href="https://github.com/HSF/phoenix/commit/a5eaa348cec487243c3549d9ff0c94d5ae15c0d5">a5eaa34</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v2.0.0...v2.1.0">2.1.0</a> (2021-06-28)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>app:</strong> clean packages not used in phoenix-ng (<a href="https://github.com/HSF/phoenix/commit/037af62579394a72dc3ba7777055d6ada3d8908a">037af62</a>)</li>
+<li><strong>event-display:</strong> bug when handling out-of-bounds theta (<a href="https://github.com/HSF/phoenix/commit/717304e724847de0e5f9f027b62ce953ddb543c9">717304e</a>)</li>
+<li><strong>event-display:</strong> cuts to match pT values (<a href="https://github.com/HSF/phoenix/commit/62ae417551e5715f81741942ace34fe89d60aa0c">62ae417</a>)</li>
+<li><strong>event-display:</strong> fix pt scale of compound objects for JiveXML (<a href="https://github.com/HSF/phoenix/commit/a821e42064113e3203f2b0aa8845751105d7ba5f">a821e42</a>)</li>
+<li><strong>event-display:</strong> handle track pT as p (scale correctly) (<a href="https://github.com/HSF/phoenix/commit/7b839e333273ad4965de7a34e83b9ffc521f8f33">7b839e3</a>)</li>
+<li><strong>event-display:</strong> simplify handling of compound objs needing a track extrapolation (<a href="https://github.com/HSF/phoenix/commit/3daabc5a95ea1384d0f212f52db67b507e92da20">3daabc5</a>)</li>
+<li><strong>event-display:</strong> since can scale jets, no longer limit length (<a href="https://github.com/HSF/phoenix/commit/bb41683910a2ee8a03f00fef71da86d14aae3f2c">bb41683</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>event-display:</strong> add AR manager (<a href="https://github.com/HSF/phoenix/commit/3017ca911e8c636154df8c4ceb441661fe39393f">3017ca9</a>)</li>
+<li><strong>event-display:</strong> add docs to AR manager (<a href="https://github.com/HSF/phoenix/commit/53349963b949c2dc1ef25ae0ed2ccae648f4ffcd">5334996</a>)</li>
+<li><strong>event-display:</strong> add scene to window EventDisplay object (<a href="https://github.com/HSF/phoenix/commit/07d86335a55e30372693640bc32481c3506fd63a">07d8633</a>)</li>
+<li><strong>event-display:</strong> combine repeating code for VR and AR into XR (<a href="https://github.com/HSF/phoenix/commit/50fc5f77367a898e5a48a2e2f3ec6c67e92749e5">50fc5f7</a>)</li>
+<li><strong>event-display:</strong> create a common xr-manager (<a href="https://github.com/HSF/phoenix/commit/2700aafc1b561d263ffe5bd55e02075957f69e47">2700aaf</a>)</li>
+<li><strong>event-display:</strong> extend ARManager from XRManager (<a href="https://github.com/HSF/phoenix/commit/ae76d4a0b9a56de07b6dfa75198cc2614ba081db">ae76d4a</a>)</li>
+<li><strong>event-display:</strong> extend VRManager from XRManager (<a href="https://github.com/HSF/phoenix/commit/15dd07c67972d5920f0234d9da1ac3e5173f96f9">15dd07c</a>)</li>
+<li><strong>event-display:</strong> handle camera position differently for AR (<a href="https://github.com/HSF/phoenix/commit/5894cac9bf973b3f3db04e5e2753ddd60108f44f">5894cac</a>)</li>
+<li><strong>event-display:</strong> refactor to make general getCompound from getMuon (<a href="https://github.com/HSF/phoenix/commit/dfe8e8dd495913c778e9135084c31fe5cb03b816">dfe8e8d</a>)</li>
+<li><strong>event-display:</strong> setup AR with event display (<a href="https://github.com/HSF/phoenix/commit/8e7396fc80e62545989cef1f5b08dbe3731c853c">8e7396f</a>)</li>
+<li><strong>event-display:</strong> use new extrapolationLimit of RKHelper and better debug output (<a href="https://github.com/HSF/phoenix/commit/14e4cbbf1c7c5d0913a164885c15cebb64be0d04">14e4cbb</a>)</li>
+<li><strong>event-display:</strong> use workaround to manage scale in AR (<a href="https://github.com/HSF/phoenix/commit/a5481e1de384d38bbbd9b54445b871994619f08f">a5481e1</a>)</li>
+<li><strong>event-display:</strong> working AR setup in event display (<a href="https://github.com/HSF/phoenix/commit/fdd492ad3efdb3a966c15b7f3fb5ae3d151ab1e0">fdd492a</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.7.0...v2.0.0">2.0.0</a> (2021-06-08)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> add energy cut, refactor (<a href="https://github.com/HSF/phoenix/commit/000ab78534b3d56cb4416358c2345c34d849254d">000ab78</a>)</li>
+<li><strong>event-display:</strong> attempt to improve robustness of tracks (<a href="https://github.com/HSF/phoenix/commit/689da2983c1751fc96709c781704625dab388ed3">689da29</a>)</li>
+<li><strong>event-display:</strong> better debugging info and prettier (<a href="https://github.com/HSF/phoenix/commit/df9ce07837be2a37885bcf8f2c4061f44922b617">df9ce07</a>)</li>
+<li><strong>event-display:</strong> fix <a href="https://github.com/HSF/phoenix/issues/289">#289</a> cluster rendering (<a href="https://github.com/HSF/phoenix/commit/1a01248cb0940e63273ee89c6317d9acda870759">1a01248</a>)</li>
+<li><strong>event-display:</strong> fix collision animation (<a href="https://github.com/HSF/phoenix/commit/3e5d80da441996aa5f905382125ff37b69ff02a3">3e5d80d</a>)</li>
+<li><strong>event-display:</strong> fix eta calculation for JiveXML (<a href="https://github.com/HSF/phoenix/commit/6dbd797c865a87a3fa9736861bd2a1fe4ff258fd">6dbd797</a>)</li>
+<li><strong>event-display:</strong> fix phoenix menu node types (<a href="https://github.com/HSF/phoenix/commit/1af6ae26964fb3a780a074378c5202ee6c9fe0a4">1af6ae2</a>)</li>
+<li><strong>event-display:</strong> fix too many params for hits (<a href="https://github.com/HSF/phoenix/commit/8b994a7014db6c72973ded26db4e8bd7e664298f">8b994a7</a>)</li>
+<li><strong>event-display:</strong> fixes and improvements for track import from JiveXML (<a href="https://github.com/HSF/phoenix/commit/c92d65f9cfc5dc788f42be71b98cea05e2174561">c92d65f</a>)</li>
+<li><strong>event-display:</strong> persist cuts when collection is toggled (<a href="https://github.com/HSF/phoenix/commit/1dd0431b996d596789f5ab501477a189e327901e">1dd0431</a>)</li>
+<li><strong>event-display:</strong> properly display the PlanarCalorimeters (<a href="https://github.com/HSF/phoenix/commit/f41920b7cb3b88113b02309f2c72463f25d0978f">f41920b</a>)</li>
+<li><strong>event-display:</strong> random colors for collections and fix color by vertex (<a href="https://github.com/HSF/phoenix/commit/303187a9ccdd6ea30478ebb567da4c53fa88af3b">303187a</a>)</li>
+<li><strong>event-display:</strong> use line animation for line hit (<a href="https://github.com/HSF/phoenix/commit/df425eeb3d3d6e2c2c9490fd1d6b399f7ea31f99">df425ee</a>)</li>
+<li>fix misc errors and improve styles (<a href="https://github.com/HSF/phoenix/commit/124a272fdb2ae75ee5883abdbfb5a2cfb2ef9251">124a272</a>)</li>
+<li><strong>event-display:</strong> rk-helper should use CoordinateHelper (<a href="https://github.com/HSF/phoenix/commit/6085f50a52a8c1fa252833b2c868b2bc5dce227d">6085f50</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add embed in sharable link constructor (<a href="https://github.com/HSF/phoenix/commit/8a0c0b1b423e7c7b8dd6935a266d6158a8fc5125">8a0c0b1</a>)</li>
+<li><strong>app:</strong> add embed menu with a URL option for embed (<a href="https://github.com/HSF/phoenix/commit/56c6eff388fef027cfbe9e9b0ff0ea4513689808">56c6eff</a>)</li>
+<li><strong>app:</strong> add load progress based on number of loaded items (<a href="https://github.com/HSF/phoenix/commit/20ef288ee3ade9f1c6535e225c992993b62f6b01">20ef288</a>)</li>
+<li><strong>app:</strong> improve background colors (<a href="https://github.com/HSF/phoenix/commit/2c97f5cc4f0d9e2933010350f02570b98a7d1f51">2c97f5c</a>)</li>
+<li><strong>app:</strong> setup for preset scene animations (<a href="https://github.com/HSF/phoenix/commit/6e919e1b7f735ff15e83997d7b5a7b8ca94db441">6e919e1</a>)</li>
+<li><strong>event-display:</strong> add a sample animation preset (<a href="https://github.com/HSF/phoenix/commit/e07725a08c79e214a5f11cf902872f74e25a32fa">e07725a</a>)</li>
+<li><strong>event-display:</strong> add color by vertex options (<a href="https://github.com/HSF/phoenix/commit/d2e05475e87b08934a4a5b3c40de9956d7d58afe">d2e0547</a>)</li>
+<li><strong>event-display:</strong> add color options to tracks collections (<a href="https://github.com/HSF/phoenix/commit/90aea3cec7d080e976299602bf0f113ba6dcba1b">90aea3c</a>)</li>
+<li><strong>event-display:</strong> add docs for color options class (<a href="https://github.com/HSF/phoenix/commit/6cd5d5346189f6d19a22b371bbd9b34804607af9">6cd5d53</a>)</li>
+<li><strong>event-display:</strong> add embed option to URL (<a href="https://github.com/HSF/phoenix/commit/cb68283a50d34184a5ff80a4776d38aa6a595851">cb68283</a>)</li>
+<li><strong>event-display:</strong> add function to animate scene (<a href="https://github.com/HSF/phoenix/commit/a4116311228465c27df7fa0d706e0aa09c40c36b">a411631</a>)</li>
+<li><strong>event-display:</strong> add momentum color options UI (<a href="https://github.com/HSF/phoenix/commit/f1d2cefae0ad0f07c4a84acbdf0d28c3b6f3932c">f1d2cef</a>)</li>
+<li><strong>event-display:</strong> add types for Phoenix menu configs (<a href="https://github.com/HSF/phoenix/commit/68f3d456b711579553ecd83d6ef6876bf707c8cd">68f3d45</a>)</li>
+<li><strong>event-display:</strong> code improvement for momentum sliders (<a href="https://github.com/HSF/phoenix/commit/1a17e99de30fae75bb0a35ba15a584786f3020f6">1a17e99</a>)</li>
+<li><strong>event-display:</strong> color options for event data objects (<a href="https://github.com/HSF/phoenix/commit/9908cc904742d1f1eceb750ffda531f5802ed2fa">9908cc9</a>)</li>
+<li><strong>event-display:</strong> complete types for phoenix menu node (<a href="https://github.com/HSF/phoenix/commit/cc04d5aca11258b5f8ff23ae7b5863f21f7eddd9">cc04d5a</a>)</li>
+<li><strong>event-display:</strong> divide collection config options into child nodes (<a href="https://github.com/HSF/phoenix/commit/2e52c22f84e748b310262c12c41678d5de55915b">2e52c22</a>)</li>
+<li><strong>event-display:</strong> highly optimize and generalize color by options (<a href="https://github.com/HSF/phoenix/commit/595d9e5297d753db972801e59c4221748a1105f2">595d9e5</a>)</li>
+<li><strong>event-display:</strong> implement color by momentum (<a href="https://github.com/HSF/phoenix/commit/9222e04c295ac674f015d43bde2ae2a90ccbf61d">9222e04</a>)</li>
+<li><strong>event-display:</strong> implement embed menu (<a href="https://github.com/HSF/phoenix/commit/872f7085aabdaa952f0cffb5bab82e7a021582fb">872f708</a>)</li>
+<li><strong>event-display:</strong> improve preset animation (<a href="https://github.com/HSF/phoenix/commit/2371f75ed224bd26ffbfb88a299daf7c5ce16543">2371f75</a>)</li>
+<li>update all packages (<a href="https://github.com/HSF/phoenix/commit/7d2eb6422375801de66642d7d8be3b26551af551">7d2eb64</a>)</li>
+<li><strong>event-display:</strong> create coloring manager and color tracks by properties (<a href="https://github.com/HSF/phoenix/commit/c4465674ef2dc745473e9d2c402eacda29d343fb">c446567</a>)</li>
+<li><strong>event-display:</strong> improve color manager code (<a href="https://github.com/HSF/phoenix/commit/38395787549dbdfe6028a194efb09f34f41ee611">3839578</a>)</li>
+<li><strong>event-display:</strong> only show selected color by options (<a href="https://github.com/HSF/phoenix/commit/3041166ccc64609501d867471277687b17383b97">3041166</a>)</li>
+<li><strong>event-display:</strong> type changes for phoenix menu (<a href="https://github.com/HSF/phoenix/commit/9a79692d56298e1b6713521026b9f64349e722aa">9a79692</a>)</li>
+<li><strong>event-display:</strong> use child node for collection&#39;s color options (<a href="https://github.com/HSF/phoenix/commit/8559830f4ad2d6463dfc463fa19d2d6265c42dc6">8559830</a>)</li>
+<li><strong>event-display:</strong> use class for color options in UI (<a href="https://github.com/HSF/phoenix/commit/4acca1a801c9650b96518654e79488c5637da503">4acca1a</a>)</li>
+<li><strong>event-dosplay:</strong> improve processing of PlanarCaloCells in Phoenix loader (<a href="https://github.com/HSF/phoenix/commit/5a8fe9f3f431611760f56806900c132ad3e36b03">5a8fe9f</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.7.0...v1.9.0">1.9.0</a> (2021-05-16)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> add energy cut, refactor (<a href="https://github.com/HSF/phoenix/commit/000ab78534b3d56cb4416358c2345c34d849254d">000ab78</a>)</li>
+<li><strong>event-display:</strong> attempt to improve robustness of tracks (<a href="https://github.com/HSF/phoenix/commit/689da2983c1751fc96709c781704625dab388ed3">689da29</a>)</li>
+<li><strong>event-display:</strong> better debugging info and prettier (<a href="https://github.com/HSF/phoenix/commit/df9ce07837be2a37885bcf8f2c4061f44922b617">df9ce07</a>)</li>
+<li><strong>event-display:</strong> fix <a href="https://github.com/HSF/phoenix/issues/289">#289</a> cluster rendering (<a href="https://github.com/HSF/phoenix/commit/1a01248cb0940e63273ee89c6317d9acda870759">1a01248</a>)</li>
+<li><strong>event-display:</strong> fix eta calculation for JiveXML (<a href="https://github.com/HSF/phoenix/commit/6dbd797c865a87a3fa9736861bd2a1fe4ff258fd">6dbd797</a>)</li>
+<li><strong>event-display:</strong> fix phoenix menu node types (<a href="https://github.com/HSF/phoenix/commit/1af6ae26964fb3a780a074378c5202ee6c9fe0a4">1af6ae2</a>)</li>
+<li><strong>event-display:</strong> fixes and improvements for track import from JiveXML (<a href="https://github.com/HSF/phoenix/commit/c92d65f9cfc5dc788f42be71b98cea05e2174561">c92d65f</a>)</li>
+<li><strong>event-display:</strong> properly display the PlanarCalorimeters (<a href="https://github.com/HSF/phoenix/commit/f41920b7cb3b88113b02309f2c72463f25d0978f">f41920b</a>)</li>
+<li><strong>event-display:</strong> rk-helper should use CoordinateHelper (<a href="https://github.com/HSF/phoenix/commit/6085f50a52a8c1fa252833b2c868b2bc5dce227d">6085f50</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add embed in sharable link constructor (<a href="https://github.com/HSF/phoenix/commit/8a0c0b1b423e7c7b8dd6935a266d6158a8fc5125">8a0c0b1</a>)</li>
+<li><strong>app:</strong> add embed menu with a URL option for embed (<a href="https://github.com/HSF/phoenix/commit/56c6eff388fef027cfbe9e9b0ff0ea4513689808">56c6eff</a>)</li>
+<li><strong>app:</strong> add load progress based on number of loaded items (<a href="https://github.com/HSF/phoenix/commit/20ef288ee3ade9f1c6535e225c992993b62f6b01">20ef288</a>)</li>
+<li><strong>event-display:</strong> add color by vertex options (<a href="https://github.com/HSF/phoenix/commit/d2e05475e87b08934a4a5b3c40de9956d7d58afe">d2e0547</a>)</li>
+<li><strong>event-display:</strong> add color options to tracks collections (<a href="https://github.com/HSF/phoenix/commit/90aea3cec7d080e976299602bf0f113ba6dcba1b">90aea3c</a>)</li>
+<li><strong>event-display:</strong> add docs for color options class (<a href="https://github.com/HSF/phoenix/commit/6cd5d5346189f6d19a22b371bbd9b34804607af9">6cd5d53</a>)</li>
+<li><strong>event-display:</strong> add embed option to URL (<a href="https://github.com/HSF/phoenix/commit/cb68283a50d34184a5ff80a4776d38aa6a595851">cb68283</a>)</li>
+<li><strong>event-display:</strong> add momentum color options UI (<a href="https://github.com/HSF/phoenix/commit/f1d2cefae0ad0f07c4a84acbdf0d28c3b6f3932c">f1d2cef</a>)</li>
+<li><strong>event-display:</strong> add types for Phoenix menu configs (<a href="https://github.com/HSF/phoenix/commit/68f3d456b711579553ecd83d6ef6876bf707c8cd">68f3d45</a>)</li>
+<li><strong>event-display:</strong> code improvement for momentum sliders (<a href="https://github.com/HSF/phoenix/commit/1a17e99de30fae75bb0a35ba15a584786f3020f6">1a17e99</a>)</li>
+<li><strong>event-display:</strong> color options for event data objects (<a href="https://github.com/HSF/phoenix/commit/9908cc904742d1f1eceb750ffda531f5802ed2fa">9908cc9</a>)</li>
+<li><strong>event-display:</strong> complete types for phoenix menu node (<a href="https://github.com/HSF/phoenix/commit/cc04d5aca11258b5f8ff23ae7b5863f21f7eddd9">cc04d5a</a>)</li>
+<li><strong>event-display:</strong> create coloring manager and color tracks by properties (<a href="https://github.com/HSF/phoenix/commit/c4465674ef2dc745473e9d2c402eacda29d343fb">c446567</a>)</li>
+<li><strong>event-display:</strong> divide collection config options into child nodes (<a href="https://github.com/HSF/phoenix/commit/2e52c22f84e748b310262c12c41678d5de55915b">2e52c22</a>)</li>
+<li><strong>event-display:</strong> highly optimize and generalize color by options (<a href="https://github.com/HSF/phoenix/commit/595d9e5297d753db972801e59c4221748a1105f2">595d9e5</a>)</li>
+<li><strong>event-display:</strong> implement color by momentum (<a href="https://github.com/HSF/phoenix/commit/9222e04c295ac674f015d43bde2ae2a90ccbf61d">9222e04</a>)</li>
+<li><strong>event-display:</strong> implement embed menu (<a href="https://github.com/HSF/phoenix/commit/872f7085aabdaa952f0cffb5bab82e7a021582fb">872f708</a>)</li>
+<li><strong>event-display:</strong> improve color manager code (<a href="https://github.com/HSF/phoenix/commit/38395787549dbdfe6028a194efb09f34f41ee611">3839578</a>)</li>
+<li><strong>event-display:</strong> only show selected color by options (<a href="https://github.com/HSF/phoenix/commit/3041166ccc64609501d867471277687b17383b97">3041166</a>)</li>
+<li><strong>event-display:</strong> type changes for phoenix menu (<a href="https://github.com/HSF/phoenix/commit/9a79692d56298e1b6713521026b9f64349e722aa">9a79692</a>)</li>
+<li><strong>event-display:</strong> use child node for collection&#39;s color options (<a href="https://github.com/HSF/phoenix/commit/8559830f4ad2d6463dfc463fa19d2d6265c42dc6">8559830</a>)</li>
+<li><strong>event-display:</strong> use class for color options in UI (<a href="https://github.com/HSF/phoenix/commit/4acca1a801c9650b96518654e79488c5637da503">4acca1a</a>)</li>
+<li><strong>event-dosplay:</strong> improve processing of PlanarCaloCells in Phoenix loader (<a href="https://github.com/HSF/phoenix/commit/5a8fe9f3f431611760f56806900c132ad3e36b03">5a8fe9f</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.7.0...v1.8.0">1.8.0</a> (2021-05-01)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> better debugging info and prettier (<a href="https://github.com/HSF/phoenix/commit/df9ce07837be2a37885bcf8f2c4061f44922b617">df9ce07</a>)</li>
+<li><strong>event-display:</strong> fix <a href="https://github.com/HSF/phoenix/issues/289">#289</a> cluster rendering (<a href="https://github.com/HSF/phoenix/commit/1a01248cb0940e63273ee89c6317d9acda870759">1a01248</a>)</li>
+<li><strong>event-display:</strong> fixes and improvements for track import from JiveXML (<a href="https://github.com/HSF/phoenix/commit/c92d65f9cfc5dc788f42be71b98cea05e2174561">c92d65f</a>)</li>
+<li><strong>event-display:</strong> rk-helper should use CoordinateHelper (<a href="https://github.com/HSF/phoenix/commit/6085f50a52a8c1fa252833b2c868b2bc5dce227d">6085f50</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> add embed in sharable link constructor (<a href="https://github.com/HSF/phoenix/commit/8a0c0b1b423e7c7b8dd6935a266d6158a8fc5125">8a0c0b1</a>)</li>
+<li><strong>app:</strong> add embed menu with a URL option for embed (<a href="https://github.com/HSF/phoenix/commit/56c6eff388fef027cfbe9e9b0ff0ea4513689808">56c6eff</a>)</li>
+<li><strong>app:</strong> add load progress based on number of loaded items (<a href="https://github.com/HSF/phoenix/commit/20ef288ee3ade9f1c6535e225c992993b62f6b01">20ef288</a>)</li>
+<li><strong>event-display:</strong> add color options to tracks collections (<a href="https://github.com/HSF/phoenix/commit/90aea3cec7d080e976299602bf0f113ba6dcba1b">90aea3c</a>)</li>
+<li><strong>event-display:</strong> add docs for color options class (<a href="https://github.com/HSF/phoenix/commit/6cd5d5346189f6d19a22b371bbd9b34804607af9">6cd5d53</a>)</li>
+<li><strong>event-display:</strong> add embed option to URL (<a href="https://github.com/HSF/phoenix/commit/cb68283a50d34184a5ff80a4776d38aa6a595851">cb68283</a>)</li>
+<li><strong>event-display:</strong> add momentum color options UI (<a href="https://github.com/HSF/phoenix/commit/f1d2cefae0ad0f07c4a84acbdf0d28c3b6f3932c">f1d2cef</a>)</li>
+<li><strong>event-display:</strong> code improvement for momentum sliders (<a href="https://github.com/HSF/phoenix/commit/1a17e99de30fae75bb0a35ba15a584786f3020f6">1a17e99</a>)</li>
+<li><strong>event-display:</strong> color options for event data objects (<a href="https://github.com/HSF/phoenix/commit/9908cc904742d1f1eceb750ffda531f5802ed2fa">9908cc9</a>)</li>
+<li><strong>event-display:</strong> create coloring manager and color tracks by properties (<a href="https://github.com/HSF/phoenix/commit/c4465674ef2dc745473e9d2c402eacda29d343fb">c446567</a>)</li>
+<li><strong>event-display:</strong> divide collection config options into child nodes (<a href="https://github.com/HSF/phoenix/commit/2e52c22f84e748b310262c12c41678d5de55915b">2e52c22</a>)</li>
+<li><strong>event-display:</strong> highly optimize and generalize color by options (<a href="https://github.com/HSF/phoenix/commit/595d9e5297d753db972801e59c4221748a1105f2">595d9e5</a>)</li>
+<li><strong>event-display:</strong> implement color by momentum (<a href="https://github.com/HSF/phoenix/commit/9222e04c295ac674f015d43bde2ae2a90ccbf61d">9222e04</a>)</li>
+<li><strong>event-display:</strong> implement embed menu (<a href="https://github.com/HSF/phoenix/commit/872f7085aabdaa952f0cffb5bab82e7a021582fb">872f708</a>)</li>
+<li><strong>event-display:</strong> use child node for collection&#39;s color options (<a href="https://github.com/HSF/phoenix/commit/8559830f4ad2d6463dfc463fa19d2d6265c42dc6">8559830</a>)</li>
+<li><strong>event-display:</strong> use class for color options in UI (<a href="https://github.com/HSF/phoenix/commit/4acca1a801c9650b96518654e79488c5637da503">4acca1a</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.6.1...v1.7.0">1.7.0</a> (2021-04-21)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>event-display:</strong> attempt to improve the output of the track extension by removing close hits (<a href="https://github.com/HSF/phoenix/commit/5bdc5623a2c4ef01a97143d12d9c396dbc57cfa3">5bdc562</a>)</li>
+<li><strong>event-display:</strong> fix drawing of hits (<a href="https://github.com/HSF/phoenix/commit/db3ca8b671bf2fa6bdf2831b8b5641cff74cf5a8">db3ca8b</a>)</li>
+<li><strong>event-display:</strong> handle older json hit format again (<a href="https://github.com/HSF/phoenix/commit/edcd56770fcb865d39592cb3f4d130cd26b3919a">edcd567</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.5.0...v1.6.0">1.6.0</a> (2021-04-18)</h1>
+<h3>Bug Fixes</h3>
+<ul>
+<li><strong>app:</strong> add sphericalToCartesian method (<a href="https://github.com/HSF/phoenix/commit/bbea6b03023cc56b5572684ec3cfaeb8cf3f0e7f">bbea6b0</a>)</li>
+<li><strong>event-display:</strong> add back in geometrical limits for clusters (<a href="https://github.com/HSF/phoenix/commit/0b95e5b9263442df35f0af6f88694e7e5ee90e90">0b95e5b</a>)</li>
+<li><strong>event-display:</strong> add eta and phi cuts for tracks (<a href="https://github.com/HSF/phoenix/commit/f8a0080b3ddd8ca79ff49ae1aa1faab66b6b4e56">f8a0080</a>)</li>
+<li><strong>event-display:</strong> add missing docs (<a href="https://github.com/HSF/phoenix/commit/c9781e5c0f876ea752a07178f072d82c45f50846">c9781e5</a>)</li>
+<li><strong>event-display:</strong> add missing documentation (<a href="https://github.com/HSF/phoenix/commit/236bdf48b49ad0538461ac636bcbf130ef4349f9">236bdf4</a>)</li>
+<li><strong>event-display:</strong> calocluster eta position was wrong. (<a href="https://github.com/HSF/phoenix/commit/66cbbc03b5592775ee1971b0f181aaf5319636f3">66cbbc0</a>)</li>
+<li><strong>event-display:</strong> cleanup JixeXML loader (<a href="https://github.com/HSF/phoenix/commit/6a834e8bb3ebfbb67110e3f2e5459fc88c11d6e8">6a834e8</a>)</li>
+<li><strong>event-display:</strong> prettier fixes (<a href="https://github.com/HSF/phoenix/commit/7528ee0c372c23418795866a3e041bbbb5e48d26">7528ee0</a>)</li>
+<li><strong>event-display:</strong> run prettier (again) (<a href="https://github.com/HSF/phoenix/commit/f279898dd34fe2e79774611397e1860f761f0b54">f279898</a>)</li>
+<li><strong>event-display:</strong> use BufferGeometry for CMS objects with new three.js update (<a href="https://github.com/HSF/phoenix/commit/b8e88b8f88ba543fdbe43c95edf9955efd570780">b8e88b8</a>)</li>
+</ul>
+<h3>Features</h3>
+<ul>
+<li><strong>app:</strong> bind clipping state with UI menu (<a href="https://github.com/HSF/phoenix/commit/40bbba07311d6c23b59d5d5409d190c2721bc395">40bbba0</a>)</li>
+<li><strong>app:</strong> complete dialog for share link and embed (<a href="https://github.com/HSF/phoenix/commit/50c2584107d132e8f7161c28ce4d88479e30c4ed">50c2584</a>)</li>
+<li><strong>app:</strong> setup link share form (<a href="https://github.com/HSF/phoenix/commit/b10bb7aa14e373191bea6508d723c79c42c3f2b3">b10bb7a</a>)</li>
+<li><strong>event-display:</strong> ability to remove geometry in Phoenix menu (<a href="https://github.com/HSF/phoenix/commit/7d90d72e4c17776855946cc3a4d80149242c4a4f">7d90d72</a>)</li>
+<li><strong>event-display:</strong> ability to scale CaloClusters (<a href="https://github.com/HSF/phoenix/commit/ff666e2c8455dbf0316e220f008bf45bccb22228">ff666e2</a>)</li>
+<li><strong>event-display:</strong> add ability to scale clusters in just one direction (<a href="https://github.com/HSF/phoenix/commit/5a562ab6d7d8a228d5c69ea5454a597372810e48">5a562ab</a>), closes <a href="https://github.com/HSF/phoenix/issues/257">#257</a></li>
+<li><strong>event-display:</strong> add coordinate helper (<a href="https://github.com/HSF/phoenix/commit/57e438fd8ba22e525595a72425d9000c82988dc1">57e438f</a>)</li>
+<li><strong>event-display:</strong> add guidelines and simplify some coordinate transformations (<a href="https://github.com/HSF/phoenix/commit/56f94f043b5bdf5e521c05e0bc058186c78270ad">56f94f0</a>)</li>
+<li><strong>event-display:</strong> Add missing energy (<a href="https://github.com/HSF/phoenix/commit/6ef17d07d8101da845b7efa0eb6698d99490bcd8">6ef17d0</a>)</li>
+<li><strong>event-display:</strong> add opacity and wireframe for CaloClusters (<a href="https://github.com/HSF/phoenix/commit/85d4a14ab1afc4518684128619824f46eda3aa9d">85d4a14</a>)</li>
+<li><strong>event-display:</strong> add support for HitLines (<a href="https://github.com/HSF/phoenix/commit/455f536a201a3bd228ac2c97bec3f45b3e769620">455f536</a>)</li>
+<li><strong>event-display:</strong> add types for dat.GUI (<a href="https://github.com/HSF/phoenix/commit/7632a180c79d2cb04fc1ec82a580bc166ab9ed4a">7632a18</a>)</li>
+<li><strong>event-display:</strong> create an active observable variable (<a href="https://github.com/HSF/phoenix/commit/854e5439a1ebeba80940989a716338f1542984db">854e543</a>)</li>
+<li><strong>event-display:</strong> improve grid lines (<a href="https://github.com/HSF/phoenix/commit/ca3cc2fa98c2bfc6f43bc6a459d7da273e6afc5a">ca3cc2f</a>)</li>
+<li><strong>event-display:</strong> improve handling of UI menus in UI manager (<a href="https://github.com/HSF/phoenix/commit/b7a324a6643a2e191483d9925ea467afb933def8">b7a324a</a>)</li>
+<li><strong>event-display:</strong> introduce new URL options and improve handling them (<a href="https://github.com/HSF/phoenix/commit/f7cd6b4b6059db82900bc9a0245d8365a5917e8b">f7cd6b4</a>)</li>
+<li><strong>event-display:</strong> JiveXML : add support for more hit types (<a href="https://github.com/HSF/phoenix/commit/bbcdf0c3ae090b693fa5fa3cf02c78fe2c50bf16">bbcdf0c</a>)</li>
+<li><strong>event-display:</strong> keep state of event data folder on event switch (<a href="https://github.com/HSF/phoenix/commit/b52282ff038d081ed752ab6c85d08bcc7145c822">b52282f</a>)</li>
+<li><strong>event-display:</strong> make Phoenix available in browser without a namespace (<a href="https://github.com/HSF/phoenix/commit/5389282be8018191426da02140cd29dcdbf2b726">5389282</a>)</li>
+<li><strong>event-display:</strong> move opacity and wireframing to collection level (<a href="https://github.com/HSF/phoenix/commit/6486982fbfdca3a8e51d05afd14804e86bb9fb14">6486982</a>)</li>
+<li><strong>event-display:</strong> options for CaloClusters (<a href="https://github.com/HSF/phoenix/commit/68cd7ad7b7f07c558d0a98c153382404375a6288">68cd7ad</a>)</li>
+<li><strong>event-display:</strong> Remove LineHits and use hits to extend tracks (<a href="https://github.com/HSF/phoenix/commit/30b5160ce9db8cbe800b3393271224a014b0aecf">30b5160</a>)</li>
+<li><strong>event-display:</strong> restructure phoenix-event-display (<a href="https://github.com/HSF/phoenix/commit/2e163718ce32dd0713100f632127ac0a2cca8238">2e16371</a>)</li>
+<li><strong>event-display:</strong> separate dat.GUI UI menu (<a href="https://github.com/HSF/phoenix/commit/29093a22737e3c9771dc4b5ca52569962b994771">29093a2</a>)</li>
+<li><strong>event-display:</strong> separate Phoenix menu UI from UI manager (<a href="https://github.com/HSF/phoenix/commit/5743adcd4b6f3fb16dac3be6211450f2f04b94d3">5743adc</a>)</li>
+<li><strong>event-display:</strong> split dat.GUI menu options (<a href="https://github.com/HSF/phoenix/commit/45a0123892092c9397a80b5c99bb9d5c156aa0b1">45a0123</a>)</li>
+<li><strong>event-display:</strong> start splitting UI manager (<a href="https://github.com/HSF/phoenix/commit/56ff275013772e958818c3100165587aa244173f">56ff275</a>)</li>
+<li><strong>event-display:</strong> use run and event number and file name for config json (<a href="https://github.com/HSF/phoenix/commit/03a1de4056c8e9acb29307b2efb906ac7e782201">03a1de4</a>)</li>
+<li>upgrade all packages except three.js (<a href="https://github.com/HSF/phoenix/commit/8e2eff4b58e02f19cefd3e02e7edf92a81474783">8e2eff4</a>)</li>
+<li>upgrade three.js except for CMSObjects (<a href="https://github.com/HSF/phoenix/commit/0b2dd8a8860ed49feb16a247b52aa0b21452a251">0b2dd8a</a>)</li>
+</ul>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.4.1...v1.5.0">1.5.0</a> (2021-03-24)</h1>
+<h3>Bug Fixes</h3>
 <ul>
 <li><strong>event-display:</strong> catch VR request session error (<a href="https://github.com/HSF/phoenix/commit/d2874b8aed6f0647f5ccb11bfade1f9c1bc1f29c">d2874b8</a>)</li>
 <li><strong>event-display:</strong> fix jsroot loading root file (<a href="https://github.com/HSF/phoenix/commit/8cbcaa5d2e4ba89940d65d217e302e7500305641">8cbcaa5</a>)</li>
@@ -45,7 +694,7 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> use per physics object color and not collection color (<a href="https://github.com/HSF/phoenix/commit/ac0c4f149c36568b5f172d24656c7d754df7b635">ac0c4f1</a>)</li>
 <li>remove JSROOT source files from repo (<a href="https://github.com/HSF/phoenix/commit/7bcd7bad7bca398242697828ae3189927ff37e89">7bcd7ba</a>)</li>
 </ul>
-<h3 id="features">Features</h3>
+<h3>Features</h3>
 <ul>
 <li><strong>app:</strong> ability to import ig archive in CMS (<a href="https://github.com/HSF/phoenix/commit/9540af5d08ab2867e6ef0496a1bd1e3215e91af7">9540af5</a>)</li>
 <li><strong>app:</strong> Add more realistic geometry for ATLAS (<a href="https://github.com/HSF/phoenix/commit/d207bad4f72f9ae5e423c61fa7dc56eebc99c3b7">d207bad</a>)</li>
@@ -54,15 +703,15 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> update to use CDN for JSROOT (<a href="https://github.com/HSF/phoenix/commit/2fa310fc0171bd19e0ec1b75322eba6b532e5bfe">2fa310f</a>)</li>
 <li><strong>event-display:</strong> use latest version of JSROOT (<a href="https://github.com/HSF/phoenix/commit/fbd584edb3dbfd436cdbe18a876c59ec05e43aa4">fbd584e</a>)</li>
 </ul>
-<h1 id="140-2021-02-16"><a href="https://github.com/HSF/phoenix/compare/v1.3.0...v1.4.0">1.4.0</a> (2021-02-16)</h1>
-<h3 id="bug-fixes-1">Bug Fixes</h3>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.3.0...v1.4.0">1.4.0</a> (2021-02-16)</h1>
+<h3>Bug Fixes</h3>
 <ul>
 <li><strong>event-display:</strong> disable keyboard controls when typing (<a href="https://github.com/HSF/phoenix/commit/4f80bd6c972f2e1291bc62015870ac9b08c077ef">4f80bd6</a>)</li>
 <li><strong>event-display:</strong> improve object selection from uuid and label input (<a href="https://github.com/HSF/phoenix/commit/3475836eacca1485f6dddab8dc049bbb605a5e27">3475836</a>)</li>
 <li><strong>event-display:</strong> persist toggle state of phoenix menu node children (<a href="https://github.com/HSF/phoenix/commit/e96136b8bade393d336a74c607db18d19d139e96">e96136b</a>)</li>
 <li><strong>event-display:</strong> remove rollup config and fix globalThis usage (<a href="https://github.com/HSF/phoenix/commit/e6f69a0e47856dc38409eaea3030595fa5c3065d">e6f69a0</a>)</li>
 </ul>
-<h3 id="features-1">Features</h3>
+<h3>Features</h3>
 <ul>
 <li><strong>event-display:</strong> ability to add 3D label text (<a href="https://github.com/HSF/phoenix/commit/c9d4880c2ef97ee07f16a30ef17c80279c853de3">c9d4880</a>)</li>
 <li><strong>event-display:</strong> add labels configuration to dat.GUI menu (<a href="https://github.com/HSF/phoenix/commit/d677089d49a5fedee4b23bcc690690decef5f8a2">d677089</a>)</li>
@@ -83,8 +732,8 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> working labels object (<a href="https://github.com/HSF/phoenix/commit/60269f78eb0c384bd628680c93ae94919b2d08d9">60269f7</a>)</li>
 <li>Update Angular and all packages to latest (<a href="https://github.com/HSF/phoenix/commit/f4c2e31207e890436a6387e2e34ef31e3d0c48a6">f4c2e31</a>)</li>
 </ul>
-<h1 id="130-2021-01-16"><a href="https://github.com/HSF/phoenix/compare/v1.2.0...v1.3.0">1.3.0</a> (2021-01-16)</h1>
-<h3 id="bug-fixes-2">Bug Fixes</h3>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.2.0...v1.3.0">1.3.0</a> (2021-01-16)</h1>
+<h3>Bug Fixes</h3>
 <ul>
 <li><strong>event-display:</strong> assign the right name to geometry (<a href="https://github.com/HSF/phoenix/commit/b7e8da002548255b0c996ebc91a06918b5819281">b7e8da0</a>)</li>
 <li><strong>event-display:</strong> code improvements (<a href="https://github.com/HSF/phoenix/commit/f94c0e40384ee95f22ba1a92938cf124a6d89a31">f94c0e4</a>)</li>
@@ -95,13 +744,13 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> revert jasmine spec files (<a href="https://github.com/HSF/phoenix/commit/dc140ddf33b083577782f55f4c2a8187c9501d44">dc140dd</a>)</li>
 <li><strong>event-display:</strong> try fixing CMSLoader tests (<a href="https://github.com/HSF/phoenix/commit/789da8b352620d485e80271283f2a133cf7d3323">789da8b</a>)</li>
 </ul>
-<h3 id="features-2">Features</h3>
+<h3>Features</h3>
 <ul>
 <li><strong>event-display:</strong> display size on selection (<a href="https://github.com/HSF/phoenix/commit/6943f792b2eb037dd4ab19b9dc806d75820b2249">6943f79</a>)</li>
 <li><strong>event-display:</strong> hide tube tracks on zoom (<a href="https://github.com/HSF/phoenix/commit/7d606b29214e9f080266ad13502fa1092605a00f">7d606b2</a>)</li>
 </ul>
-<h1 id="120-2020-12-06"><a href="https://github.com/HSF/phoenix/compare/v1.1.0...v1.2.0">1.2.0</a> (2020-12-06)</h1>
-<h3 id="bug-fixes-3">Bug Fixes</h3>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.1.0...v1.2.0">1.2.0</a> (2020-12-06)</h1>
+<h3>Bug Fixes</h3>
 <ul>
 <li><strong>event-display:</strong> add Edward&#39;s controller set up (<a href="https://github.com/HSF/phoenix/commit/a6a1c19d696aff6e6c239fef76dcd3c24f4897a1">a6a1c19</a>)</li>
 <li><strong>event-display:</strong> changes to animation loop for VR (<a href="https://github.com/HSF/phoenix/commit/37df19f17b0f6d37229e95dacf295e388dcefbd1">37df19f</a>)</li>
@@ -117,7 +766,7 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> stop animation loop on home (<a href="https://github.com/HSF/phoenix/commit/c39ecd3d57744e5ad117de6cd0aafc2c81b5c58d">c39ecd3</a>)</li>
 <li><strong>event-display:</strong> update configuration in tests (<a href="https://github.com/HSF/phoenix/commit/18f8db2e7d9cf5ccbcf1111112d4fec0449fa087">18f8db2</a>)</li>
 </ul>
-<h3 id="features-3">Features</h3>
+<h3>Features</h3>
 <ul>
 <li><strong>app:</strong> add toggle for screenshot mode (<a href="https://github.com/HSF/phoenix/commit/22a1ec8903ac80d72f564eca29e49d15cbd411ce">22a1ec8</a>)</li>
 <li><strong>app:</strong> make loader generic (<a href="https://github.com/HSF/phoenix/commit/ff10477b40fae8554813b283a644c6aeb421f88a">ff10477</a>)</li>
@@ -133,8 +782,8 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> support for toggling antialiasing (<a href="https://github.com/HSF/phoenix/commit/48130b2c53a1c0a8d105f1e81ecf4f0146eb3763">48130b2</a>)</li>
 <li><strong>event-display:</strong> use object to simplify configuration (<a href="https://github.com/HSF/phoenix/commit/4b10452a80aed8e67ddac5d550cc9fd15383bad3">4b10452</a>)</li>
 </ul>
-<h1 id="110-2020-11-07"><a href="https://github.com/HSF/phoenix/compare/v1.0.2...v1.1.0">1.1.0</a> (2020-11-07)</h1>
-<h3 id="bug-fixes-4">Bug Fixes</h3>
+<h1><a href="https://github.com/HSF/phoenix/compare/v1.0.2...v1.1.0">1.1.0</a> (2020-11-07)</h1>
+<h3>Bug Fixes</h3>
 <ul>
 <li><strong>app:</strong> cut filter failed if value return was zero (<a href="https://github.com/HSF/phoenix/commit/0a26fea050358e0444f6f257b74e9616ce2d0a91">0a26fea</a>)</li>
 <li><strong>app:</strong> cut should be pT, not mom (<a href="https://github.com/HSF/phoenix/commit/73b7c2709bf829516d94e4cf7e90c96b0016fdaf">73b7c27</a>)</li>
@@ -148,7 +797,7 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> use optional chaining in CMS loader (<a href="https://github.com/HSF/phoenix/commit/cfb1b6a9d49a1b812a6e7d569756a4e65899f5b7">cfb1b6a</a>)</li>
 <li><strong>VR:</strong> Fix bugged scene in VR mode (<a href="https://github.com/HSF/phoenix/commit/9efd9ca6cf814109a8901ce0d80eec90fc765c72">9efd9ca</a>)</li>
 </ul>
-<h3 id="features-4">Features</h3>
+<h3>Features</h3>
 <ul>
 <li><strong>app:</strong> Option to load config from URL in ATLAS (<a href="https://github.com/HSF/phoenix/commit/1906976f763dcb6d7748037e3f9cf4dd5796b230">1906976</a>)</li>
 <li><strong>app:</strong> phoenix-ui-components library (<a href="https://github.com/HSF/phoenix/commit/17909ebfd0e6a788933c85231410d9fa0516a428">17909eb</a>)</li>
@@ -157,11 +806,11 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 <li><strong>event-display:</strong> implicitly load event data from URL (<a href="https://github.com/HSF/phoenix/commit/9e3dc20748559a38289a9cf42da40bd85c72a492">9e3dc20</a>)</li>
 <li><strong>event-display:</strong> state manager for managing event display state for save and load (<a href="https://github.com/HSF/phoenix/commit/7d1ca22f5e9bfa430297597b1d4da116eaf075a2">7d1ca22</a>)</li>
 </ul>
-<h2 id="small102-2020-10-05small"><small>1.0.2 (2020-10-05)</small></h2>
+<h2><small>1.0.2 (2020-10-05)</small></h2>
 <ul>
 <li>Complete deployment set up (<a href="https://github.com/HSF/phoenix/commit/399ac77">399ac77</a>)</li>
 </ul>
-<h2 id="101-2020-10-05">1.0.1 (2020-10-05)</h2>
+<h2>1.0.1 (2020-10-05)</h2>
 <p><strong>Note:</strong> Version bump only for package phoenix-event-display</p>
 
 
@@ -177,14 +826,18 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
 
 
 
-                   
+
+
+
+
+
 
 
 
 
                    </div><div class="search-results">
     <div class="has-results">
-        <h1 class="search-results-title"><span class='search-results-count'></span> result-matching "<span class='search-query'></span>"</h1>
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
         <ul class="search-results-list"></ul>
     </div>
     <div class="no-results">
@@ -196,25 +849,46 @@ See <a href="https://conventionalcommits.org">Conventional Commits</a> for commi
            </div>
        </div>
 
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
        <script>
             var COMPODOC_CURRENT_PAGE_DEPTH = 0;
-            var COMPODOC_CURRENT_PAGE_CONTEXT = 'getting-started';
+            var COMPODOC_CURRENT_PAGE_CONTEXT = 'changelog';
             var COMPODOC_CURRENT_PAGE_URL = 'changelog.html';
             var MAX_SEARCH_RESULTS = 15;
        </script>
 
+       <script>
+               $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               checkToggle(darkModeState);
+               if ($darkModeToggleSwitchers.length > 0) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].addEventListener('change', function (event) {
+                              darkModeState = !darkModeState;
+                              toggleDarkMode(darkModeState);
+                         });
+                    }
+               }
+          </script>
+
        <script src="./js/libs/custom-elements.min.js"></script>
        <script src="./js/libs/lit-html.js"></script>
-       <!-- Required to polyfill modern browsers as code is ES5 for IE... -->
-       <script src="./js/libs/custom-elements-es5-adapter.js" charset="utf-8" defer></script>
+
        <script src="./js/menu-wc.js" defer></script>
+       <script nomodule src="./js/menu-wc_es5.js" defer></script>
 
        <script src="./js/libs/bootstrap-native.js"></script>
 
        <script src="./js/libs/es6-shim.min.js"></script>
        <script src="./js/libs/EventDispatcher.js"></script>
        <script src="./js/libs/promise.min.js"></script>
-       <script src="./js/libs/zepto.min.js"></script>
 
        <script src="./js/compodoc.js"></script>
 

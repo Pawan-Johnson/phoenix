@@ -1,11 +1,10 @@
 import { PhoenixLoader } from './phoenix-loader';
+import { openFile } from 'jsroot';
 
 /**
  * PhoenixLoader for processing and loading an event from ".root".
  */
 export class JSRootEventLoader extends PhoenixLoader {
-  /** JSROOT object containing all JSROOT functions. */
-  private JSROOT: any;
   /** Event data inside the file. */
   private fileEventData: any;
   /** URL of the ".root" file to be processed. */
@@ -13,13 +12,10 @@ export class JSRootEventLoader extends PhoenixLoader {
 
   /**
    * Constructor for the JSRoot event loader.
-   * @param JSROOT JSROOT object containing all JSROOT functions.
    * @param rootFileURL URL of the ".root" file to be processed.
    */
-  constructor(JSROOT: any, rootFileURL: string) {
+  constructor(rootFileURL: string) {
     super();
-
-    this.JSROOT = JSROOT;
     this.rootFileURL = rootFileURL;
 
     this.fileEventData = {
@@ -38,9 +34,9 @@ export class JSRootEventLoader extends PhoenixLoader {
    */
   public getEventData(
     objects: string[],
-    onEventData: (eventData: any) => void
+    onEventData: (eventData: any) => void,
   ) {
-    this.JSROOT.openFile(this.rootFileURL).then((file: any) => {
+    openFile(this.rootFileURL).then((file: any) => {
       let i = 0;
       for (const objectName of objects) {
         file.readObject(objectName).then((object: any) => {
@@ -49,7 +45,12 @@ export class JSRootEventLoader extends PhoenixLoader {
             this.processItemsList(object);
           }
           if (i === objects.length) {
-            for (let objectType of ['Hits', 'Tracks', 'Jets', 'CaloClusters']) {
+            for (const objectType of [
+              'Hits',
+              'Tracks',
+              'Jets',
+              'CaloClusters',
+            ]) {
               if (Object.keys(this.fileEventData[objectType]).length === 0) {
                 this.fileEventData[objectType] = undefined;
               }
@@ -69,7 +70,7 @@ export class JSRootEventLoader extends PhoenixLoader {
     if (obj._typename === 'TObjArray' || obj._typename === 'TList') {
       if (!obj.arr) return;
       for (let n = 0; n < obj.arr.length; ++n) {
-        let sobj = obj.arr[n];
+        const sobj = obj.arr[n];
         this.processItemsList(sobj);
       }
     } else if (obj._typename === 'THREE.Mesh') {
@@ -144,8 +145,7 @@ export class JSRootEventLoader extends PhoenixLoader {
   private getTEveTrack(track: any): any {
     if (!track || track.fN <= 0) return false;
 
-    const trackObj = {};
-
+    const trackObj: { [key: string]: any } = {};
     const positions = [];
     for (let i = 0; i < track.fN - 1; i++) {
       positions.push([
@@ -177,7 +177,7 @@ export class JSRootEventLoader extends PhoenixLoader {
 
     const hitArray = [];
 
-    for (var i = 0; i < hit.fN; i += 3) {
+    for (let i = 0; i < hit.fN; i += 3) {
       hitArray.push([hit.fP[i * 3], hit.fP[i * 3 + 1], hit.fP[i * 3 + 2]]);
     }
 

@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/spec",
+    "types": ["jest", "node"],
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true
+  },
+  "include": [
+    "projects/phoenix-ui-components/lib/**/*.spec.ts",
+    "projects/phoenix-ui-components/lib/**/*.ts"
+  ]
+}

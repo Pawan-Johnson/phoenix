@@ -1,67 +1,129 @@
-import { Component, OnInit } from '@angular/core';
-import { EventDisplayService } from 'phoenix-ui-components';
-import { HttpClient } from '@angular/common/http';
+import { Component, type OnInit, type OnDestroy } from '@angular/core';
+import {
+  EventDataFormat,
+  type EventDataImportOption,
+  EventDisplayService,
+  type UIMenuConfig,
+  defaultUIMenuConfig,
+} from 'phoenix-ui-components';
 import {
   PhoenixMenuNode,
-  LHCbLoader,
-  Configuration,
+  type Configuration,
   PresetView,
+  ClippingSetting,
+  PhoenixLoader,
 } from 'phoenix-event-display';
+import { Plane, Vector3 } from 'three';
 
 @Component({
+  standalone: false, // this is now required when using NgModule
   selector: 'app-lhcb',
   templateUrl: './lhcb.component.html',
   styleUrls: ['./lhcb.component.scss'],
 })
-export class LHCbComponent implements OnInit {
+export class LHCbComponent implements OnInit, OnDestroy {
   events: any;
-  loader: LHCbLoader;
   phoenixMenuRoot: PhoenixMenuNode = new PhoenixMenuNode(
     'Phoenix Menu',
-    'phoenix-menu'
+    'phoenix-menu',
   );
   loaded = false;
+  loadingProgress = 0;
 
-  constructor(
-    private eventDisplay: EventDisplayService,
-    private http: HttpClient
-  ) {}
+  eventDataImportOptions: EventDataImportOption[] = [
+    EventDataFormat.JSON,
+    EventDataFormat.ZIP,
+  ];
+
+  /** UI menu config: hide eta-phi panel (LHCb is forward, has no CaloCells/CaloClusters). */
+  uiConfig: UIMenuConfig = {
+    ...defaultUIMenuConfig,
+    showEtaPhiPanel: false,
+  };
+
+  /** Prevents callbacks on destroyed component */
+  private isDestroyed = false;
+
+  constructor(private eventDisplay: EventDisplayService) {}
+
+  ngOnDestroy() {
+    this.isDestroyed = true;
+  }
 
   ngOnInit() {
-    this.loader = new LHCbLoader();
-
     const configuration: Configuration = {
-      eventDataLoader: this.loader,
+      eventDataLoader: new PhoenixLoader(),
       presetViews: [
-        new PresetView('Right View', [0, 0, 6000], 'right-cube'),
-        new PresetView('Center View', [-500, 1000, 0], 'top-cube'),
-        new PresetView('Left View', [0, 0, -6000], 'left-cube'),
+        new PresetView(
+          'Global View',
+          [-8000, 6000, 0],
+          [0, 0, 8000],
+          'perspective',
+          ClippingSetting.On,
+          90,
+          90,
+        ),
+        new PresetView(
+          'Calo View',
+          [-8000, 6000, 16000],
+          [0, 0, 12000],
+          'perspective',
+          ClippingSetting.On,
+          90,
+          90,
+        ),
+        new PresetView(
+          'Side View',
+          [-12000, 0, 12000],
+          [0, 0, 12000],
+          'right-cube',
+        ),
+        new PresetView(
+          'Vertex Locator View',
+          [-500, 1000, 0],
+          [0, 0, 0],
+          'top-cube',
+        ),
+        new PresetView('Front View', [0, 0, -6000], [0, 0, 0], 'left-cube'),
+        new PresetView(
+          'Top View',
+          [0, 16000, 12000],
+          [0, 0, 12000],
+          'top-cube',
+        ),
       ],
-      defaultView: [-800, 300, -1000],
+      defaultView: [-8000, 6000, 0, 0, 0, 8000], // x,y,z of position followed by x,y,z of target
       phoenixMenuRoot: this.phoenixMenuRoot,
+      defaultEventFile: {
+        eventFile: 'assets/files/lhcb/LHCbEventData.json',
+        eventType: 'json',
+      },
     };
 
     this.eventDisplay.init(configuration);
 
-    this.eventDisplay.loadGLTFGeometry(
-      'assets/geometry/LHCb/lhcb.gltf',
-      'LHCb detector'
-    );
+    try {
+      this.eventDisplay.loadGLTFGeometry(
+        'assets/geometry/LHCb/LHCb.glb.zip',
+        undefined, // name, ignored when empty
+        undefined, // menuNodeName
+        1, // scale
+        true, // initiallyVisible
+      );
+    } catch (e) {
+      console.log('Error:', e);
+    }
 
-    this.loadEventData();
+    this.eventDisplay.getLoadingManager().addProgressListener((progress) => {
+      if (!this.isDestroyed) {
+        this.loadingProgress = progress;
+      }
+    });
 
     this.eventDisplay.getLoadingManager().addLoadListenerWithCheck(() => {
-      this.loaded = true;
+      if (!this.isDestroyed) {
+        this.loaded = true;
+      }
     });
-  }
-
-  private loadEventData() {
-    this.http
-      .get('assets/files/lhcb/00191749_0005296728.json')
-      .subscribe((data: any) => {
-        this.loader.process(data);
-        const eventData = this.loader.getEventData();
-        this.eventDisplay.buildEventDataFromJSON(eventData);
-      });
   }
 }

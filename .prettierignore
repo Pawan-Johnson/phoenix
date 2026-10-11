@@ -6,9 +6,20 @@ tmp/
 out-tsc/
 # only exists if Bazel was run
 bazel-out/
+docs/
+# written at build time by scripts/generate-version.js
+packages/phoenix-ng/projects/phoenix-app/src/environments/version.ts
 
 # dependencies
 node_modules/
+# Added as per https://yarnpkg.com/getting-started/qa#which-files-should-be-gitignored
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 # profiling files
 chrome-profiler-events.json
@@ -45,6 +56,7 @@ packages/**/docs/
 
 # angular compiler
 __ivy_ngcc__
+.angular
 
 # system files
 .DS_Store
@@ -52,4 +64,4 @@ Thumbs.db
 
 # prettier specific
 assets/
-*.md
+CHANGELOG.md

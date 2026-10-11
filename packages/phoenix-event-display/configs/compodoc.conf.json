@@ -1,4 +1,10 @@
 {
   "include": ["../src/**/*.ts"],
-  "exclude": ["../**/*.spec.ts", "../**/*test.ts", "../**/*.d.ts"]
+  "exclude": [
+    "../**/*.spec.ts",
+    "../**/*test.ts",
+    "../**/*.d.ts",
+    "../src/tests/**/*.ts",
+    "../src/lib/types/**/*.ts"
+  ]
 }

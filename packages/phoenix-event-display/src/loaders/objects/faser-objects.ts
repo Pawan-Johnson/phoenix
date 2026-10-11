@@ -1,12 +1,32 @@
-import { Vector3, Object3D, CatmullRomCurve3, TubeBufferGeometry, MeshToonMaterial, Mesh, BufferGeometry, LineBasicMaterial, Line, Group, Quaternion, CylinderBufferGeometry, MeshBasicMaterial, BufferAttribute, PointsMaterial, Points, BoxBufferGeometry, MeshPhongMaterial, SphereBufferGeometry } from 'three';
+import {
+  Vector3,
+  Object3D,
+  CatmullRomCurve3,
+  TubeGeometry,
+  MeshToonMaterial,
+  Mesh,
+  BufferGeometry,
+  LineBasicMaterial,
+  Line,
+  Group,
+  Quaternion,
+  CylinderGeometry,
+  MeshBasicMaterial,
+  BufferAttribute,
+  PointsMaterial,
+  Points,
+  BoxGeometry,
+  MeshPhongMaterial,
+  SphereGeometry,
+} from 'three';
 import { EVENT_DATA_TYPE_COLORS } from '../../helpers/constants';
+import { PhoenixObjects } from './phoenix-objects';
 import { RKHelper } from '../../helpers/rk-helper';
 
 /**
  * Physics objects that make up an event in Faser.
  */
 export class FaserObjects {
-
   /**
    * Process the Track from the given parameters (and positions)
    * and get it as a geometry.
@@ -14,69 +34,45 @@ export class FaserObjects {
    * @returns Track object.
    */
   public static getTrack(trackParams: any): Object3D {
-    console.log("DOING TRACKING")
-    console.log(trackParams)	
-    let positions = trackParams.pos;
-    // Track with no points
-    // if (positions.length==0) {
-    //   console.log("Track with no positions.")
-    //   return;
-    // }
-
+    let positions = trackParams.pos ?? [];
     // Track with too few points are extrapolated with RungeKutta
-    if (positions.length < 3) {
-       console.log("DOING TRACK EXTRAP WITH RK")
+    if (positions.length < 2) {
       if (trackParams?.dparams) {
-        console.log("TRACK Found dparams")
-        // Test, for ATLAS. 
+        // Test, for ATLAS.
         // FIXME - make configurable
-        let inBounds = function (pos: Vector3) {
-          if (pos.z > 3000)
-            return false;
-          if (Math.sqrt(pos.x * pos.x + pos.y * pos.y) > 1100)
-            return false;
+        const inBounds = function (pos: Vector3) {
+          if (pos.z > 3000) return false;
+          if (Math.sqrt(pos.x * pos.x + pos.y * pos.y) > 1100) return false;
 
-          return true
+          return true;
         };
 
-	positions = RKHelper.extrapolateTrackPositions(trackParams, inBounds);
-	//  positions = RKHelper.extrapolateTrackPositions(trackParams, true);
+        positions = RKHelper.extrapolateTrackPositions(trackParams, inBounds);
       }
     }
     // Check again, in case there was an issue with the extrapolation.
-    if (positions.length < 3) {
-      console.log("TOO FEW TRACK POSITIONS: "+positions.length)
+    if (positions.length < 2) {
       return;
     }
 
-
-    // const length = 100;
     let objectColor = EVENT_DATA_TYPE_COLORS['Tracks'].getHex();
     if (trackParams.color) {
       objectColor = parseInt(trackParams.color, 16);
     }
 
-    // // Apply pT cut TODO - make this configurable.
-    // const momentum = trackParams.mom;
-    // if (momentum) {
-    //   if (momentum[0] * momentum[0] + momentum[1] * momentum[1] + momentum[2] * momentum[2] < 0.25) {
-    //     // console.log('Track mom<0.5 GeV. Skipping. Positions are: ' + positions + ' particle_id: ' + track.particle_id);
-    //     return;
-    //   }
-    // }
-
     const points = [];
 
     for (let i = 0; i < positions.length; i++) {
-      console.log("TRACK Position "+i)
-      points.push(new Vector3(positions[i][0], positions[i][1], positions[i][2]));
+      points.push(
+        new Vector3(positions[i][0], positions[i][1], positions[i][2]),
+      );
     }
 
     // attributes
     const curve = new CatmullRomCurve3(points);
 
     // TubeGeometry
-    const geometry = new TubeBufferGeometry(curve, undefined, 2);
+    const geometry = new TubeGeometry(curve, undefined, 2);
     const material = new MeshToonMaterial({ color: objectColor });
     const tubeObject = new Mesh(geometry, material);
 
@@ -85,7 +81,7 @@ export class FaserObjects {
     const lineGeometry = new BufferGeometry().setFromPoints(vertices);
     const lineMaterial = new LineBasicMaterial({
       color: objectColor,
-      linewidth: 2
+      linewidth: 2,
     });
     const lineObject = new Line(lineGeometry, lineMaterial);
     lineObject.name = 'Track';
@@ -96,7 +92,7 @@ export class FaserObjects {
     trackObject.add(lineObject);
 
     // Setting info to the tubeObject and trackObject for selection and cuts
-    for (let object of [tubeObject, trackObject]) {
+    for (const object of [tubeObject, trackObject]) {
       object.userData = Object.assign({}, trackParams);
       object.name = 'Track';
     }
@@ -116,7 +112,9 @@ export class FaserObjects {
     const eta = jetParams.eta;
     const phi = jetParams.phi;
     // If theta is given then use that else calculate from eta
-    const theta = jetParams.theta ? jetParams.theta : (2 * Math.atan(Math.pow(Math.E, eta)));
+    const theta = jetParams.theta
+      ? jetParams.theta
+      : 2 * Math.atan(Math.pow(Math.E, eta));
     // Jet energy parameter can either be 'energy' or 'et'
     let length = (jetParams.energy ? jetParams.energy : jetParams.et) * 0.2;
     // Ugh - We don't want the Jets to go out of the event display
@@ -130,7 +128,11 @@ export class FaserObjects {
     const stheta = Math.sin(theta);
     const ctheta = Math.cos(theta);
     //
-    const translation = new Vector3(0.5 * length * cphi * stheta, 0.5 * length * sphi * stheta, 0.5 * length * ctheta);
+    const translation = new Vector3(
+      0.5 * length * cphi * stheta,
+      0.5 * length * sphi * stheta,
+      0.5 * length * ctheta,
+    );
 
     const x = cphi * stheta;
     const y = sphi * stheta;
@@ -140,9 +142,13 @@ export class FaserObjects {
     const quaternion = new Quaternion();
     quaternion.setFromUnitVectors(v1, v2);
 
-    const geometry = new CylinderBufferGeometry(width, 1, length, 50, 50, false); // Cone
+    const geometry = new CylinderGeometry(width, 1, length, 50, 50, false); // Cone
 
-    const material = new MeshBasicMaterial({ color: EVENT_DATA_TYPE_COLORS['Jets'], opacity: 0.3, transparent: true });
+    const material = new MeshBasicMaterial({
+      color: EVENT_DATA_TYPE_COLORS['Jets'],
+      opacity: 0.3,
+      transparent: true,
+    });
     material.opacity = 0.5;
     const mesh = new Mesh(geometry, material);
     mesh.position.copy(translation);
@@ -188,7 +194,10 @@ export class FaserObjects {
     geometry.setAttribute('position', new BufferAttribute(pointPos, 3));
     geometry.computeBoundingSphere();
     // material
-    const material = new PointsMaterial({ size: 30, color: EVENT_DATA_TYPE_COLORS['Hits'] });
+    const material = new PointsMaterial({
+      size: 30,
+      color: EVENT_DATA_TYPE_COLORS['Hits'],
+    });
     // object
     const pointsObj = new Points(geometry, material);
     pointsObj.userData = Object.assign({}, hitsParamsClone);
@@ -205,24 +214,33 @@ export class FaserObjects {
    * @returns Cluster object.
    */
   public static getCluster(clusterParams: any): Object3D {
-
+    // Some legacy samples use standard Phoenix angular cluster coordinates.
+    if (
+      ![clusterParams.x, clusterParams.y, clusterParams.z].every(
+        Number.isFinite,
+      )
+    ) {
+      return PhoenixObjects.getCluster(clusterParams);
+    }
     let objectColor = EVENT_DATA_TYPE_COLORS['CaloClusters'].getHex();
-    
+
     let length = 115.0;
     const trigger_threshold = 1000.0;
-    
+
     if (clusterParams.energy) {
-        if (clusterParams.energy < trigger_threshold) { // scale by fraction of threshold
-            length = length * clusterParams.energy / trigger_threshold;    
-    	} else { // if over threshold set green
-            objectColor = 0x00ff40; 
-        }
+      if (clusterParams.energy < trigger_threshold) {
+        // scale by fraction of threshold
+        length = (length * clusterParams.energy) / trigger_threshold;
+      } else {
+        // if over threshold set green
+        objectColor = 0x00ff40;
+      }
     } else {
-      objectColor = 0xD8D8D8;
+      objectColor = 0xd8d8d8;
     }
 
     // geometry
-    const geometry = new BoxBufferGeometry(length, length, 510);
+    const geometry = new BoxGeometry(length, length, 510);
     // material
     const material = new MeshPhongMaterial({ color: objectColor });
     // object
@@ -245,7 +263,6 @@ export class FaserObjects {
    * @returns Cluster object.
    */
   public static getLargeScintHits(largeScintParams: any): Object3D {
-
     let objectColor = EVENT_DATA_TYPE_COLORS['CaloClusters'].getHex();
     if (largeScintParams.color) {
       objectColor = parseInt(largeScintParams.color, 16);
@@ -253,20 +270,21 @@ export class FaserObjects {
 
     let length = 260.0;
     const trigger_threshold = 1000.0;
-    
-    if (largeScintParams.energy>0) {
-        if (largeScintParams.energy < trigger_threshold) { // scale by fraction of threshold
-            length = length * largeScintParams.energy / trigger_threshold;    
-    	} else { // if over threshold set green
-            objectColor = 0x00ff40; 
-        }
+
+    if (largeScintParams.energy > 0) {
+      if (largeScintParams.energy < trigger_threshold) {
+        // scale by fraction of threshold
+        length = (length * largeScintParams.energy) / trigger_threshold;
+      } else {
+        // if over threshold set green
+        objectColor = 0x00ff40;
+      }
     } else {
-      objectColor = 0xD8D8D8;
+      objectColor = 0xd8d8d8;
     }
 
-    
     // geometry
-    const geometry = new BoxBufferGeometry(length, length, 10);
+    const geometry = new BoxGeometry(length, length, 10);
     // material
     const material = new MeshPhongMaterial({ color: objectColor });
     // object
@@ -289,7 +307,6 @@ export class FaserObjects {
    * @returns Cluster object.
    */
   public static getTimingScintHits(timingScintParams: any): Object3D {
-
     let objectColor = EVENT_DATA_TYPE_COLORS['CaloClusters'].getHex();
     if (timingScintParams.color) {
       objectColor = parseInt(timingScintParams.color, 16);
@@ -297,19 +314,21 @@ export class FaserObjects {
 
     let length = 400.0;
     const trigger_threshold = 1000.0;
-    
+
     if (timingScintParams.energy) {
-        if (timingScintParams.energy < trigger_threshold) { // if under threshold scale to fraction of threshold
-            length = length * timingScintParams.energy / trigger_threshold;    
-    	} else { // if over threshold set green
-            objectColor = 0x00ff40; 
-        }
+      if (timingScintParams.energy < trigger_threshold) {
+        // if under threshold scale to fraction of threshold
+        length = (length * timingScintParams.energy) / trigger_threshold;
+      } else {
+        // if over threshold set green
+        objectColor = 0x00ff40;
+      }
     } else {
-      objectColor = 0xD8D8D8;
+      objectColor = 0xd8d8d8;
     }
 
     // geometry
-    const geometry = new BoxBufferGeometry(length, length * 150.0/400., 8);
+    const geometry = new BoxGeometry(length, (length * 150.0) / 400, 8);
     // material
     const material = new MeshPhongMaterial({ color: objectColor });
     // object
@@ -333,14 +352,16 @@ export class FaserObjects {
    */
   public static getVertex(vertexParams: any): Object3D {
     // geometry
-    const geometry = new SphereBufferGeometry(3);
+    const geometry = new SphereGeometry(3);
     // material
-    const material = new MeshPhongMaterial({ color: EVENT_DATA_TYPE_COLORS['Vertices'] });
+    const material = new MeshPhongMaterial({
+      color: EVENT_DATA_TYPE_COLORS['Vertices'],
+    });
     // object
     const sphere = new Mesh(geometry, material);
     sphere.position.x = vertexParams.x;
     sphere.position.y = vertexParams.y;
-    sphere.position.z = vertexParams.y;
+    sphere.position.z = vertexParams.z;
 
     sphere.userData = Object.assign({}, vertexParams);
     sphere.name = 'Vertex';
@@ -349,5 +370,4 @@ export class FaserObjects {
 
     return sphere;
   }
-
 }

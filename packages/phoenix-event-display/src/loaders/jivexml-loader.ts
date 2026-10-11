@@ -7,13 +7,17 @@ import { CoordinateHelper } from '../helpers/coordinate-helper';
 export class JiveXMLLoader extends PhoenixLoader {
   /** Event data in JiveXML data format */
   private data: any;
+  /** List of tracks to draw with thicker tubes */
+  thickTrackCollections: string[];
 
   /**
    * Constructor for the JiveXMLLoader.
+   * @param thickTrackCollections A list of names of track collections which should be drawn thicker
    */
-  constructor() {
+  constructor(thickTrackCollections: string[] = []) {
     super();
     this.data = {};
+    this.thickTrackCollections = thickTrackCollections;
   }
 
   /**
@@ -45,6 +49,8 @@ export class JiveXMLLoader extends PhoenixLoader {
       Tracks: {},
       Jets: {},
       CaloClusters: {},
+      CaloCells: {},
+      PlanarCaloCells: {},
       Vertices: {},
       Electrons: {},
       Muons: {},
@@ -57,9 +63,11 @@ export class JiveXMLLoader extends PhoenixLoader {
     this.getSCTClusters(firstEvent, eventData);
     this.getTRT_DriftCircles(firstEvent, eventData);
     this.getMuonPRD(firstEvent, 'MDT', eventData);
-    this.getMuonPRD(firstEvent, 'RPC', eventData);
+    this.getRPC(firstEvent, eventData);
     this.getMuonPRD(firstEvent, 'TGC', eventData);
     this.getMuonPRD(firstEvent, 'CSCD', eventData);
+    this.getMuonPRD(firstEvent, 'MM', eventData);
+    this.getMuonPRD(firstEvent, 'STGC', eventData);
 
     // Tracks
     // (must be filled after hits because it might use them)
@@ -70,6 +78,12 @@ export class JiveXMLLoader extends PhoenixLoader {
 
     // Clusters
     this.getCaloClusters(firstEvent, eventData);
+
+    // Cells
+    // this.getFCALCaloCells(firstEvent, 'FCAL', eventData);
+    this.getCaloCells(firstEvent, 'LAr', eventData);
+    this.getCaloCells(firstEvent, 'HEC', eventData);
+    this.getCaloCells(firstEvent, 'Tile', eventData);
 
     // Vertices
     this.getVertices(firstEvent, eventData);
@@ -95,7 +109,7 @@ export class JiveXMLLoader extends PhoenixLoader {
   private getNumberArrayFromHTML(collection: Element, key: any) {
     // console.log(collection);
     let array = [];
-    let elements = collection.getElementsByTagName(key);
+    const elements = collection.getElementsByTagName(key);
     if (elements.length) {
       array = elements[0].innerHTML
         .replace(/\r\n|\n|\r/gm, ' ')
@@ -107,18 +121,21 @@ export class JiveXMLLoader extends PhoenixLoader {
   }
 
   /**
-   * Get the number array from a collection in XML DOM.
+   * Get the string array from a collection in XML DOM.
    * @param collection Collection in XML DOM of JiveXML format.
    * @param key Tag name of the string array.
-   * @returns String array.
+   * @returns String array, or empty array if tag not found.
    */
-  private getStringArrayFromHTML(collection: Element, key: any) {
-    return collection
-      .getElementsByTagName(key)[0]
-      .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-      .trim()
-      .split(' ')
-      .map(String);
+  private getStringArrayFromHTML(collection: Element, key: any): string[] {
+    const elements = collection.getElementsByTagName(key);
+    if (elements.length) {
+      return elements[0].innerHTML
+        .replace(/\r\n|\n|\r/gm, ' ')
+        .trim()
+        .split(' ')
+        .map(String);
+    }
+    return [];
   }
   /**
    * Try to get the position of a hit (i.e. linked from a track)
@@ -127,8 +144,8 @@ export class JiveXMLLoader extends PhoenixLoader {
    * @returns [found, x, y, z].
    */
   private getPositionOfHit(
-    hitIdentifier,
-    eventData: { Hits: [[{ id: number; pos: any }]] }
+    hitIdentifier: number,
+    eventData: { Hits: [[{ id: number; pos: any }]] },
   ) {
     for (const hitcollection in eventData.Hits) {
       for (const hit of eventData.Hits[hitcollection]) {
@@ -144,25 +161,44 @@ export class JiveXMLLoader extends PhoenixLoader {
   }
 
   /**
+   * Get a track collection name which does not clash with an event data type.
+   * We have problems if the name of the collection is a type, so a collection
+   * named `Tracks` is renamed to `Tracks_`.
+   * @param collectionName Name (storeGateKey) of the track collection.
+   * @returns The (possibly renamed) collection name.
+   */
+  private getSafeTrackCollectionName(collectionName: string): string {
+    return collectionName === 'Tracks' ? 'Tracks_' : collectionName;
+  }
+
+  /**
    * Extract Tracks from the JiveXML data format and process them.
    * @param firstEvent First "Event" element in the XML DOM of the JiveXML data format.
    * @param eventData Event data object to be updated with Tracks.
    */
-  public getTracks(firstEvent: Element, eventData: { Tracks: any; Hits: any }) {
+  public getTracks(
+    firstEvent: Element,
+    eventData: { Tracks: any; Hits: any },
+  ): void {
     const tracksHTML = firstEvent.getElementsByTagName('Track');
     const trackCollections = Array.from(tracksHTML);
-    const nameOfCollection = 'Tracks';
+    const badTracks: { [key: string]: any } = {};
+
     for (const collection of trackCollections) {
-      let trackCollectionName = collection.getAttribute('storeGateKey');
+      const trackCollectionName = this.getSafeTrackCollectionName(
+        collection.getAttribute('storeGateKey') ?? 'Unknown',
+      );
+
+      let thickTracks = false;
       if (
-        trackCollectionName === 'Tracks' ||
-        trackCollectionName === 'GSFTracks' ||
-        trackCollectionName === 'GSFTrackParticles'
+        this.thickTrackCollections.find(
+          (collection) => collection === trackCollectionName,
+        )
       ) {
-        // Tracks are duplicates of CombinedInDetTracks (though so maybe check that they're in the file before skipping?)
-        // GSF tracks cause problems at the moment.
-        continue;
+        thickTracks = true;
       }
+
+      // if (!trackCollectionName.includes('MuonSpectrometer')) continue;
       const numOfTracks = Number(collection.getAttribute('count'));
       const jsontracks = [];
 
@@ -170,27 +206,36 @@ export class JiveXMLLoader extends PhoenixLoader {
       // then convert to array of numbers
       const tmp = collection.getElementsByTagName('numPolyline');
 
-      let numPolyline: number[];
-
+      let polylineX: number[] = [];
+      let polylineY: number[] = [];
+      let polylineZ: number[] = [];
+      let numPolyline: number[] = [];
       if (tmp.length === 0) {
-        // console.log("WARNING the track collection " + trackColl.getAttribute("storeGateKey") + " has no line information. Skipping.");
-        // continue;
+        console.log(
+          'WARNING the track collection ' +
+            trackCollectionName +
+            ' has no line information. Will rely on Phoenix to extrapolate.',
+        );
       } else {
         numPolyline = this.getNumberArrayFromHTML(collection, 'numPolyline');
 
         const polyLineXHTML = collection.getElementsByTagName('polylineX');
-        if (polyLineXHTML.length) {
-          // This can happen with e.g. TrackParticles
-          var polylineX = polyLineXHTML[0].innerHTML
+
+        if (polyLineXHTML.length > 0) {
+          polylineX = polyLineXHTML[0].innerHTML
             .replace(/\r\n|\n|\r/gm, ' ')
             .trim()
             .split(' ')
             .map(Number);
-          var polylineY = this.getNumberArrayFromHTML(collection, 'polylineY');
-          var polylineZ = this.getNumberArrayFromHTML(collection, 'polylineZ');
+          // Assume the rest are okay.
+          polylineY = this.getNumberArrayFromHTML(collection, 'polylineY');
+          polylineZ = this.getNumberArrayFromHTML(collection, 'polylineZ');
         } else {
           // unset numPolyline so check later is simple (it will all be zeros anyway)
-          numPolyline = null;
+          numPolyline = [];
+          polylineX = [];
+          polylineY = [];
+          polylineZ = [];
         }
       }
 
@@ -204,36 +249,79 @@ export class JiveXMLLoader extends PhoenixLoader {
       const hits = this.getNumberArrayFromHTML(collection, 'hits');
       const numHits = this.getNumberArrayFromHTML(collection, 'numHits');
 
-      if (collection.getElementsByTagName('trackAuthor').length) {
-        var trackAuthor = this.getNumberArrayFromHTML(
-          collection,
-          'trackAuthor'
+      // Sanity check of some required quantities
+      if (
+        numOfTracks != pT.length ||
+        numOfTracks != d0.length ||
+        numOfTracks != z0.length ||
+        numOfTracks != cotTheta.length
+      ) {
+        console.log(
+          'ERROR: Wrong number of some track variables. Corrupted JiveXML?',
         );
       }
 
+      let trackAuthor;
+      if (collection.getElementsByTagName('trackAuthor').length) {
+        trackAuthor = this.getNumberArrayFromHTML(collection, 'trackAuthor');
+      }
+
       let polylineCounter = 0,
-        hitsCounter = 0;
+        hitsCounter = 0; // Both of these need to persist throughout the track collection.
+      // Sanity check:
+      if (numPolyline && numPolyline.length != numOfTracks)
+        console.log(
+          'numPolyline ',
+          numPolyline.length,
+          'numOfTracks',
+          numOfTracks,
+        );
       for (let i = 0; i < numOfTracks; i++) {
+        let storeTrack = true; // Need to do this because we need to retrieve all info so counters don't go wrong.
+        const debugTrack = false;
         const track = {
+          index: i, // Original index in the JiveXML collection, needed to e.g. match vertex track links when bad tracks are dropped.
           chi2: 0.0,
           dof: 0.0,
           pT: 0.0,
           phi: 0.0,
           eta: 0.0,
-          pos: [],
-          dparams: [],
+          pos: [] as number[][],
+          dparams: [] as number[], // Explicitly define the type as number[]
           hits: {},
-          author: {},
+          author: undefined as number | undefined,
+          badtrack: [] as string[],
+          linewidth: thickTracks ? 20.0 : undefined,
         };
         if (chi2.length >= i) track.chi2 = chi2[i];
         if (numDoF.length >= i) track.dof = numDoF[i];
-        if (trackAuthor.length >= i) track.author = trackAuthor[i];
-        const theta = Math.tan(cotTheta[i]);
-        track.pT = Math.abs(pT[i]);
-        const momentum = (pT[i] / Math.sin(theta)) * 1000; // JiveXML uses GeV
-        track.dparams = [d0[i], z0[i], phi0[i], theta, 1.0 / momentum];
+        if (trackAuthor && i < trackAuthor.length)
+          track.author = trackAuthor[i];
+
+        let theta = Math.atan(1 / cotTheta[i]);
+
+        track.pT = Math.abs(pT[i]) * 1000; // JiveXML uses GeV
+        const momentum = track.pT / Math.sin(theta);
+        track.dparams = [
+          d0[i],
+          z0[i],
+          phi0[i],
+          theta,
+          Math.sign(pT[i]) / momentum,
+        ];
         track.phi = phi0[i];
 
+        // if (track.phi == 1.37786) {
+        // if (i === 0) {
+        //   console.log('Cuplrit found! Index = ', i);
+        //   debugTrack = true;
+        //   storeTrack = true;
+        // }
+
+        if (theta < 0) {
+          theta += Math.PI;
+          // TODO - check if we need to flip phi here?
+        }
         // FIXME - should probably handle this better ... what if phi = 4PI for example?
         if (track.phi > Math.PI) {
           track.phi -= 2.0 * Math.PI;
@@ -241,50 +329,153 @@ export class JiveXMLLoader extends PhoenixLoader {
           track.phi += 2.0 * Math.PI;
         }
 
+        if (!CoordinateHelper.anglesAreSane(theta, track.phi)) {
+          badTracks['Improper angles']++;
+          track.badtrack.push('Improper angles');
+          storeTrack = false;
+        }
+
         track.eta = CoordinateHelper.thetaToEta(theta);
+
+        if (Number.isNaN(track.eta)) {
+          track.badtrack.push('Invalid eta');
+          storeTrack = false;
+        }
+
         const pos = [],
           listOfHits = [];
         let maxR = 0.0,
+          radius = 0.0,
           x = 0.0,
           y = 0.0,
           z = 0.0;
         if (numPolyline) {
+          // Sanity check
+          if (
+            polylineCounter + numPolyline[i] > polylineX.length ||
+            polylineCounter + numPolyline[i] > polylineY.length ||
+            polylineCounter + numPolyline[i] > polylineZ.length
+          ) {
+            console.log(
+              'ERROR: not enough points left for this track. Corrupted JiveXML?',
+            );
+          }
           for (let p = 0; p < numPolyline[i]; p++) {
-            x = polylineX[polylineCounter + p];
-            y = polylineY[polylineCounter + p];
-            z = polylineZ[polylineCounter + p];
+            x = polylineX[polylineCounter + p] * 10.0;
+            y = polylineY[polylineCounter + p] * 10.0;
+            z = polylineZ[polylineCounter + p] * 10.0;
             pos.push([x, y, z]);
-            maxR = Math.sqrt(x * x + y * y + z * z);
+            radius = Math.sqrt(x * x + y * y + z * z);
+            if (radius < maxR) {
+              console.log(
+                'WARNING: track positions do not seem to be sorted radially',
+              );
+              badTracks['Hits not sorted']++;
+              track.badtrack.push('Hits not sorted');
+            }
+            if (debugTrack) {
+              console.log('pos: ', p, '/', numPolyline[i], ':', pos);
+              console.log(
+                'theta:',
+                theta,
+                'theta from hit',
+                Math.acos(z / radius),
+              );
+            }
+            maxR = radius;
           }
           polylineCounter += numPolyline[i];
           track.pos = pos;
         }
-        // Now loop over hits, and if possible, see if we can extend the track
-        if (numHits.length > 0) {
-          let hitIdentifier = 0;
-          let distance = 0.0;
-          let found = false;
-          for (let p = 0; p < numHits[i]; p++) {
-            hitIdentifier = hits[hitsCounter + p];
-            listOfHits.push(hitIdentifier);
-            // Now try to find matching hit
-            [found, x, y, z] = this.getPositionOfHit(hitIdentifier, eventData);
-            if (found) {
-              distance = Math.sqrt(x * x + y * y + z * z);
-              if (distance > maxR) {
-                track.pos.push([x, y, z]);
+        if (
+          // eslint-disable-next-line
+          false &&
+          numHits.length > 0 &&
+          trackCollectionName?.includes('Muon')
+        ) {
+          // Disable for the moment.
+
+          // Now loop over hits, and if possible, see if we can extend the track
+          const measurementPositions = [];
+          if (numHits.length > 0) {
+            let hitIdentifier = 0;
+            let distance = 0.0;
+            let found = false;
+            for (let p = 0; p < numHits[i]; p++) {
+              hitIdentifier = hits[hitsCounter + p];
+              listOfHits.push(hitIdentifier);
+              // Now try to find matching hit
+              [found, x, y, z] = this.getPositionOfHit(
+                hitIdentifier,
+                eventData,
+              );
+              if (found) {
+                distance = Math.sqrt(x * x + y * y + z * z);
+                if (distance > maxR) {
+                  measurementPositions.push([x, y, z, distance]);
+                }
+              }
+            }
+            hitsCounter += numHits[i];
+            track.hits = listOfHits;
+          }
+
+          // This seems to give pretty poor results, so try to filter.
+          // Sort radially (sorry cosmics!)
+          const sortedMeasurements = measurementPositions.sort(
+            (a, b) => a[3] - b[3],
+          );
+          const minDelta = 250; // tweaked by trial and error
+          let newHitCount = 0;
+          let rejectedHitCount = 0;
+          let lastDistance = maxR + minDelta;
+          if (sortedMeasurements.length) {
+            for (const meas of sortedMeasurements) {
+              if (meas[3] > lastDistance + minDelta) {
+                track.pos.push([meas[0], meas[1], meas[2]]);
+                lastDistance = meas[3] + minDelta;
+                newHitCount++;
+              } else {
+                rejectedHitCount++;
               }
             }
           }
-          hitsCounter += numHits[i];
-          track.hits = listOfHits;
+          console.log(
+            'Added ' +
+              newHitCount +
+              ' hits to ' +
+              trackCollectionName +
+              ' (and rejected ' +
+              rejectedHitCount +
+              ')',
+          );
         }
 
-        jsontracks.push(track);
+        if (storeTrack) jsontracks.push(track);
+      }
+      // Final sanity check here
+      if (
+        numPolyline &&
+        (polylineCounter != polylineX.length ||
+          polylineCounter != polylineY.length ||
+          polylineCounter != polylineZ.length)
+      ) {
+        console.log(
+          'ERROR: something has gone wrong with assigning the positions to the tracks!',
+        );
       }
 
       eventData.Tracks[trackCollectionName] = jsontracks;
       // }
+    }
+    for (const error in badTracks) {
+      if (badTracks[error] > 0)
+        console.log(
+          badTracks[error] +
+            ' tracks had "' +
+            error +
+            '" and were marked as bad.',
+        );
     }
   }
 
@@ -309,7 +500,7 @@ export class JiveXMLLoader extends PhoenixLoader {
     eventData.Hits.Pixel = [];
 
     for (let i = 0; i < numOfClusters; i++) {
-      let pixel = { pos: [], id: 0, energyLoss: 0 };
+      const pixel = { pos: [] as number[], id: 0, energyLoss: 0 };
       pixel.pos = [x0[i] * 10.0, y0[i] * 10.0, z0[i] * 10.0];
       pixel.id = id[i];
       pixel.energyLoss = eloss[i];
@@ -343,7 +534,7 @@ export class JiveXMLLoader extends PhoenixLoader {
     eventData.Hits.SCT = [];
 
     for (let i = 0; i < numOfSCTClusters; i++) {
-      let sct = { pos: [], id: 0, phiModule: 0, side: 0 };
+      const sct = { pos: [] as number[], id: 0, phiModule: 0, side: 0 };
       sct.pos = [x0[i] * 10.0, y0[i] * 10.0, z0[i] * 10.0];
       sct.id = id[i];
       sct.phiModule = phiModule[i];
@@ -374,15 +565,15 @@ export class JiveXMLLoader extends PhoenixLoader {
     const threshold = this.getNumberArrayFromHTML(dcHTML, 'threshold');
     const timeOverThreshold = this.getNumberArrayFromHTML(
       dcHTML,
-      'timeOverThreshold'
+      'timeOverThreshold',
     );
 
     eventData.Hits.TRT = [];
 
     // Hardcoding TRT size here. Could maybe think of generalising this?
     for (let i = 0; i < numOfDC; i++) {
-      let trt = {
-        pos: [],
+      const trt = {
+        pos: [] as number[],
         id: 0,
         type: 'Line',
         driftR: 0.0,
@@ -434,7 +625,7 @@ export class JiveXMLLoader extends PhoenixLoader {
   public getMuonPRD(
     firstEvent: Element,
     name: string,
-    eventData: { Hits: any }
+    eventData: { Hits: any },
   ) {
     if (firstEvent.getElementsByTagName(name).length === 0) {
       return;
@@ -451,34 +642,96 @@ export class JiveXMLLoader extends PhoenixLoader {
     const z = this.getNumberArrayFromHTML(dcHTML, 'z');
     const length = this.getNumberArrayFromHTML(dcHTML, 'length');
 
-    if (dcHTML.getElementsByTagName('driftR').length > 0) {
-      const driftR = this.getNumberArrayFromHTML(dcHTML, 'driftR');
-    }
+    // if (dcHTML.getElementsByTagName('driftR').length > 0) {
+    //   const driftR = this.getNumberArrayFromHTML(dcHTML, 'driftR');
+    // }
+
+    // if (dcHTML.getElementsByTagName('measuresPhi').length > 0) {
+    //   const measuresPhi = this.getNumberArrayFromHTML(dcHTML, 'measuresPhi');
+    // }
+
     const id = this.getNumberArrayFromHTML(dcHTML, 'id');
     const identifier = this.getStringArrayFromHTML(dcHTML, 'identifier');
 
     eventData.Hits[name] = [];
 
-    let radius = 0.0,
-      scaling = 0.0;
     for (let i = 0; i < numOfDC; i++) {
-      let muonHit = { pos: [], id: 0, type: 'Line', identifier: '' };
+      const muonHit = {
+        pos: this.getMuonLinePositions(i, x, y, z, length),
+        id: id[i],
+        type: 'Line',
+        identifier: identifier[i],
+      };
 
-      radius = Math.sqrt(x[i] * x[i] + y[i] * y[i]);
-      scaling = length[i] / radius;
-
-      muonHit.pos = [
-        x[i] * 10.0 - y[i] * scaling,
-        y[i] * 10.0 + x[i] * scaling,
-        z[i] * 10.0,
-        x[i] * 10.0 + y[i] * scaling,
-        y[i] * 10.0 - x[i] * scaling,
-        z[i] * 10.0,
-      ];
-      muonHit.id = id[i];
-      muonHit.identifier = identifier[i];
       eventData.Hits[name].push(muonHit);
     }
+  }
+
+  /**
+   * Extract RPC measurements from the JiveXML data format and process them.
+   * @param firstEvent First "Event" element in the XML DOM of the JiveXML data format.
+   * @param eventData Event data object to be updated with TRT Drift Circles.
+   */
+  public getRPC(firstEvent: Element, eventData: { Hits: any }) {
+    const name = 'RPC';
+    if (firstEvent.getElementsByTagName(name).length === 0) {
+      return;
+    }
+
+    const dcHTML = firstEvent.getElementsByTagName(name)[0];
+
+    const numOfDC = Number(dcHTML.getAttribute('count'));
+    const x = this.getNumberArrayFromHTML(dcHTML, 'x');
+    const y = this.getNumberArrayFromHTML(dcHTML, 'y');
+    const z = this.getNumberArrayFromHTML(dcHTML, 'z');
+    const length = this.getNumberArrayFromHTML(dcHTML, 'length');
+    const width = this.getNumberArrayFromHTML(dcHTML, 'width');
+    const id = this.getNumberArrayFromHTML(dcHTML, 'id');
+    const identifier = this.getStringArrayFromHTML(dcHTML, 'identifier');
+
+    eventData.Hits[name] = [];
+
+    for (let i = 0; i < numOfDC; i++) {
+      const rpcHit = {
+        pos: this.getMuonLinePositions(i, x, y, z, length),
+        id: id[i],
+        type: 'Line',
+        identifier: identifier[i],
+        width: width[i],
+      };
+
+      //TODO - handle phi measurements
+      eventData.Hits[name].push(rpcHit);
+    }
+  }
+  /**
+   * Get the end coordinates of a line, given its centre and its length.
+   * @param i index of the current coordinate
+   * @param x Array of x coordinates
+   * @param y Array of y coordinates
+   * @param z Array of z coordinates
+   * @param length Length of the line (i.e. strip or tube) that we need to draw
+   */
+  private getMuonLinePositions(
+    i: number,
+    x: number[],
+    y: number[],
+    z: number[],
+    length: number[],
+  ) {
+    const radius = Math.sqrt(x[i] * x[i] + y[i] * y[i]);
+    const scaling = length[i] / radius;
+    // didn't bother multiplying by 10 for radius and length, since they cancel in scaling
+    // 2 coords, beginning and end of line
+    const pos = [
+      x[i] * 10.0 - y[i] * scaling * 5.0,
+      y[i] * 10.0 + x[i] * scaling * 5.0,
+      z[i] * 10.0,
+      x[i] * 10.0 + y[i] * scaling * 5.0,
+      y[i] * 10.0 - x[i] * scaling * 5.0,
+      z[i] * 10.0,
+    ];
+    return pos;
   }
 
   /**
@@ -489,10 +742,7 @@ export class JiveXMLLoader extends PhoenixLoader {
   public getJets(firstEvent: Element, eventData: { Jets: any }) {
     const jetsHTML = firstEvent.getElementsByTagName('Jet');
     const jetCollections = Array.from(jetsHTML);
-    const nameOfCollection = 'AntiKt4TopoJets';
     for (const jetColl of jetCollections) {
-      // Extract the only collection we (currently) care about
-      // if (jetColl.getAttribute("storeGateKey")==nameOfCollection){
       const numOfJets = Number(jetColl.getAttribute('count'));
 
       // The nodes are big strings of numbers, and contain carriage returns. So need to strip all of this, make to array of strings,
@@ -500,18 +750,18 @@ export class JiveXMLLoader extends PhoenixLoader {
       const phi = this.getNumberArrayFromHTML(jetColl, 'phi');
       const eta = this.getNumberArrayFromHTML(jetColl, 'eta');
       const energy = this.getNumberArrayFromHTML(jetColl, 'energy');
-
+      const coneR = this.getNumberArrayFromHTML(jetColl, 'coneR');
       const temp = []; // Ugh
       for (let i = 0; i < numOfJets; i++) {
         temp.push({
-          coneR: 0.4,
+          coneR: coneR[i] ?? 0.4, // Set default of 0.4, since some JiveXML files might not have this.
           phi: phi[i],
           eta: eta[i],
           energy: energy[i] * 1000.0,
         });
       }
-      eventData.Jets[jetColl.getAttribute('storeGateKey')] = temp;
-      // }
+      const key = jetColl.getAttribute('storeGateKey');
+      if (key) eventData.Jets[key] = temp;
     }
   }
 
@@ -522,11 +772,10 @@ export class JiveXMLLoader extends PhoenixLoader {
    */
   public getCaloClusters(
     firstEvent: Element,
-    eventData: { CaloClusters: any }
+    eventData: { CaloClusters: any },
   ) {
     const clustersHTML = firstEvent.getElementsByTagName('Cluster');
     const clusterCollections = Array.from(clustersHTML);
-    const nameOfCollection = 'CaloTopoCluster_ESD';
     for (const clusterColl of clusterCollections) {
       const numOfClusters = Number(clusterColl.getAttribute('count'));
 
@@ -538,8 +787,106 @@ export class JiveXMLLoader extends PhoenixLoader {
       for (let i = 0; i < numOfClusters; i++) {
         temp.push({ phi: phi[i], eta: eta[i], energy: energy[i] * 1000.0 });
       }
-      eventData.CaloClusters[clusterColl.getAttribute('storeGateKey')] = temp;
+      const key = clusterColl.getAttribute('storeGateKey');
+      if (key) eventData.CaloClusters[key] = temp;
       // }
+    }
+  }
+
+  /**
+   * Extract Calo Cells from the JiveXML data format and process them.
+   * @param firstEvent First "Event" element in the XML DOM of the JiveXML data format.
+   * @param eventData Event data object to be updated with Calo Clusters.
+   */
+  public getFCALCaloCells(
+    firstEvent: Element,
+    name: string,
+    eventData: { PlanarCaloCells: any },
+  ) {
+    if (firstEvent.getElementsByTagName(name).length === 0) {
+      return;
+    }
+    const dcHTML = firstEvent.getElementsByTagName(name)[0];
+
+    const numOfDC = Number(dcHTML.getAttribute('count'));
+    const x = this.getNumberArrayFromHTML(dcHTML, 'x');
+    const y = this.getNumberArrayFromHTML(dcHTML, 'y');
+    const z = this.getNumberArrayFromHTML(dcHTML, 'z');
+    const dx = this.getNumberArrayFromHTML(dcHTML, 'dx');
+    const dy = this.getNumberArrayFromHTML(dcHTML, 'dy');
+    const dz = this.getNumberArrayFromHTML(dcHTML, 'dz');
+    const channel = this.getNumberArrayFromHTML(dcHTML, 'channel');
+    const energy = this.getNumberArrayFromHTML(dcHTML, 'energy');
+    const id = this.getNumberArrayFromHTML(dcHTML, 'id');
+    const slot = this.getStringArrayFromHTML(dcHTML, 'slot');
+
+    eventData.PlanarCaloCells[name] = { cells: [] };
+
+    let oldZ = 0;
+    for (let i = 0; i < numOfDC; i++) {
+      // Planar Calo cells need:
+      // pos
+      // length, size
+      // and on the collection, a plane
+
+      // Need to handle that some JiveXML is missing z,dz
+      const cellz = z.length ? z[i] * 10 : 10;
+      const celldz = dz.length ? dz[i] * 10 : dx[i];
+
+      const cell = {
+        pos: [x[i] * 10, y[i] * 10, cellz],
+        length: celldz,
+        cellSize: dx[i] * 10,
+        id: id[i],
+        slot: slot[i],
+        channel: channel[i],
+      };
+
+      eventData.PlanarCaloCells[name].cells.push(cell);
+      if (oldZ && oldZ != cellz) {
+        console.log(
+          "WARNING - we're assuming that all cells have the same z. This is apparently not correct!",
+        );
+      }
+      oldZ = cellz;
+    }
+    eventData.PlanarCaloCells[name].plane = [10, 10, oldZ]; // Just assuming
+  }
+
+  /**
+   * Extract Calo Cells from the JiveXML data format and process them.
+   * @param firstEvent First "Event" element in the XML DOM of the JiveXML data format.
+   * @param eventData Event data object to be updated with Calo Clusters.
+   */
+  public getCaloCells(
+    firstEvent: Element,
+    name: string = 'FCAL',
+    eventData: { CaloCells: any },
+  ) {
+    if (firstEvent.getElementsByTagName(name).length === 0) {
+      return;
+    }
+    const dcHTML = firstEvent.getElementsByTagName(name)[0];
+
+    const numOfDC = Number(dcHTML.getAttribute('count'));
+    const eta = this.getNumberArrayFromHTML(dcHTML, 'eta');
+    const phi = this.getNumberArrayFromHTML(dcHTML, 'phi');
+    const channel = this.getNumberArrayFromHTML(dcHTML, 'channel');
+    const energy = this.getNumberArrayFromHTML(dcHTML, 'energy');
+    const id = this.getNumberArrayFromHTML(dcHTML, 'id');
+    const slot = this.getStringArrayFromHTML(dcHTML, 'slot');
+
+    eventData.CaloCells[name] = [];
+
+    for (let i = 0; i < numOfDC; i++) {
+      const cell = {
+        eta: eta[i],
+        phi: phi[i],
+        id: id[i],
+        energy: energy[i],
+        channel: channel[i],
+      };
+      eventData.CaloCells[name].push(cell);
     }
   }
 
@@ -554,72 +901,34 @@ export class JiveXMLLoader extends PhoenixLoader {
     for (const vertexColl of vertexCollections) {
       const numOfObjects = Number(vertexColl.getAttribute('count'));
 
-      // The nodes are big strings of numbers, and contain carriage returns. So need to strip all of this, make to array of strings,
-      // then convert to array of numbers
-      const x = vertexColl
-        .getElementsByTagName('x')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const y = vertexColl
-        .getElementsByTagName('y')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const z = vertexColl
-        .getElementsByTagName('z')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const chi2 = vertexColl
-        .getElementsByTagName('chi2')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const primVxCand = vertexColl
-        .getElementsByTagName('primVxCand')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const vertexType = vertexColl
-        .getElementsByTagName('vertexType')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const numTracks = vertexColl
-        .getElementsByTagName('numTracks')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const sgkeyOfTracks = vertexColl
-        .getElementsByTagName('sgkey')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(String);
-      const trackIndices = vertexColl
-        .getElementsByTagName('tracks')[0]
-        .innerHTML.replace(/\r\n|\n|\r/gm, ' ')
-        .trim()
-        .split(' ')
-        .map(Number);
-      const temp = []; // Ugh
+      // Use safe helper methods to extract arrays - returns empty array if tag not found
+      const x = this.getNumberArrayFromHTML(vertexColl, 'x');
+      const y = this.getNumberArrayFromHTML(vertexColl, 'y');
+      const z = this.getNumberArrayFromHTML(vertexColl, 'z');
+      const chi2 = this.getNumberArrayFromHTML(vertexColl, 'chi2');
+      const primVxCand = this.getNumberArrayFromHTML(vertexColl, 'primVxCand');
+      const vertexType = this.getNumberArrayFromHTML(vertexColl, 'vertexType');
+      const numTracks = this.getNumberArrayFromHTML(vertexColl, 'numTracks');
+      const sgkeyOfTracks = this.getStringArrayFromHTML(vertexColl, 'sgkey');
+      const trackIndices = this.getNumberArrayFromHTML(vertexColl, 'tracks');
+
+      // Skip this collection if required vertex position data is missing
+      if (x.length === 0 || y.length === 0 || z.length === 0) {
+        console.warn(
+          `Skipping vertex collection: missing required x/y/z data for ${vertexColl.getAttribute('storeGateKey')}`,
+        );
+        continue;
+      }
+
+      const temp = [];
       let trackIndex = 0;
       for (let i = 0; i < numOfObjects; i++) {
-        let maxIndex = trackIndex + numTracks[i];
-        let thisTrackIndices = [];
+        const maxIndex = trackIndex + (numTracks[i] || 0);
+        const thisTrackIndices = [];
         for (; trackIndex < maxIndex; trackIndex++) {
-          if (trackIndex > trackIndices.length) {
-            console.log(
-              'Error! TrackIndex exceeds maximum number of track indices.'
-            );
+          if (trackIndex >= trackIndices.length) {
+            console.warn('TrackIndex exceeds maximum number of track indices.');
+            break;
           }
           thisTrackIndices.push(trackIndices[trackIndex]);
         }
@@ -631,10 +940,13 @@ export class JiveXMLLoader extends PhoenixLoader {
           primVxCand: primVxCand[i],
           vertexType: vertexType[i],
           linkedTracks: thisTrackIndices,
-          linkedTrackCollection: sgkeyOfTracks[i],
+          linkedTrackCollection: sgkeyOfTracks[i]
+            ? this.getSafeTrackCollectionName(sgkeyOfTracks[i])
+            : sgkeyOfTracks[i],
         });
       }
-      eventData.Vertices[vertexColl.getAttribute('storeGateKey')] = temp;
+      const key = vertexColl.getAttribute('storeGateKey');
+      if (key) eventData.Vertices[key] = temp;
     }
   }
 
@@ -655,15 +967,19 @@ export class JiveXMLLoader extends PhoenixLoader {
         const eta = this.getNumberArrayFromHTML(collection, 'eta');
         const phi = this.getNumberArrayFromHTML(collection, 'phi');
         const pt = this.getNumberArrayFromHTML(collection, 'pt');
+        const pdgId = this.getNumberArrayFromHTML(collection, 'pdgId');
+
         temp.push({
           chi2: chi2[i],
           energy: energy[i],
           eta: eta[i],
           phi: phi[i],
-          pt: pt[i],
+          pt: pt[i] * 1000, // JiveXML uses GeV
+          pdgId: pdgId[i],
         });
       }
-      eventData.Muons[collection.getAttribute('storeGateKey')] = temp;
+      const key = collection.getAttribute('storeGateKey');
+      if (key) eventData.Muons[key] = temp;
     }
   }
 
@@ -684,15 +1000,19 @@ export class JiveXMLLoader extends PhoenixLoader {
         const eta = this.getNumberArrayFromHTML(collection, 'eta');
         const phi = this.getNumberArrayFromHTML(collection, 'phi');
         const pt = this.getNumberArrayFromHTML(collection, 'pt');
+        const pdgId = this.getNumberArrayFromHTML(collection, 'pdgId');
+
         temp.push({
           author: author[i],
           energy: energy[i],
           eta: eta[i],
           phi: phi[i],
-          pt: pt[i],
+          pt: pt[i] * 1000, // JiveXML uses GeV
+          pdgId: pdgId[i],
         });
       }
-      eventData.Electrons[collection.getAttribute('storeGateKey')] = temp;
+      const key = collection.getAttribute('storeGateKey');
+      if (key) eventData.Electrons[key] = temp;
     }
   }
 
@@ -718,10 +1038,11 @@ export class JiveXMLLoader extends PhoenixLoader {
           energy: energy[i],
           eta: eta[i],
           phi: phi[i],
-          pt: pt[i],
+          pt: pt[i] * 1000, // JiveXML uses GeV
         });
       }
-      eventData.Photons[collection.getAttribute('storeGateKey')] = temp;
+      const key = collection.getAttribute('storeGateKey');
+      if (key) eventData.Photons[key] = temp;
     }
   }
 
@@ -732,7 +1053,7 @@ export class JiveXMLLoader extends PhoenixLoader {
    */
   public getMissingEnergy(
     firstEvent: Element,
-    eventData: { MissingEnergy: any }
+    eventData: { MissingEnergy: any },
   ) {
     const objHTML = firstEvent.getElementsByTagName('ETMis');
     const objCollections = Array.from(objHTML);
@@ -750,7 +1071,8 @@ export class JiveXMLLoader extends PhoenixLoader {
           ety: ety[i],
         });
       }
-      eventData.MissingEnergy[collection.getAttribute('storeGateKey')] = temp;
+      const key = collection.getAttribute('storeGateKey');
+      if (key) eventData.MissingEnergy[key] = temp;
     }
   }
 }

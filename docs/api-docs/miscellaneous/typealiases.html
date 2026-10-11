@@ -8,13 +8,79 @@
         <meta name="viewport" content="width=device-width, initial-scale=1">
 
         <link rel="icon" type="image/x-icon" href="../images/favicon.ico">
-	      <link rel="stylesheet" href="../styles/style.css">
+	   <link rel="stylesheet" href="../styles/style.css">
+        <link rel="stylesheet" href="../styles/dark.css">
     </head>
     <body>
+          <script>
+               // Blocking script to avoid flickering dark mode
+               // Dark mode toggle button
+               var useDark = window.matchMedia('(prefers-color-scheme: dark)');
+               var darkModeState = useDark.matches;
+               var $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               var $darkModeToggles = document.querySelectorAll('.dark-mode-switch');
+               var darkModeStateLocal = localStorage.getItem('compodoc_darkmode-state');
 
-        <div class="navbar navbar-default navbar-fixed-top visible-xs">
-            <a href="../" class="navbar-brand">Phoenix API Docs</a>
-            <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               function checkToggle(check) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].checked = check;
+                    }
+               }
+
+               function toggleDarkMode(state) {
+                    if (window.localStorage) {
+                         localStorage.setItem('compodoc_darkmode-state', state);
+                    }
+
+                    checkToggle(state);
+
+                    const hasClass = document.body.classList.contains('dark');
+
+                    if (state) {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.add('dark');
+                         }
+                         if (!hasClass) {
+                              document.body.classList.add('dark');
+                         }
+                    } else {
+                         for (var i = 0; i < $darkModeToggles.length; i++) {
+                              $darkModeToggles[i].classList.remove('dark');
+                         }
+                         if (hasClass) {
+                              document.body.classList.remove('dark');
+                         }
+                    }
+               }
+
+               useDark.addEventListener('change', function (evt) {
+                    toggleDarkMode(evt.matches);
+               });
+               if (darkModeStateLocal) {
+                    darkModeState = darkModeStateLocal === 'true';
+               }
+               toggleDarkMode(darkModeState);
+          </script>
+          <script>
+              // --- Iframe navigation tracking for Template Playground ---
+              function sendCurrentUrlToParent() {
+                  if (window.parent && window.parent !== window) {
+                      window.parent.postMessage({
+                          type: 'compodoc-iframe-navigate',
+                          url: window.location.pathname + window.location.hash
+                      }, '*');
+                  }
+              }
+              window.addEventListener('hashchange', sendCurrentUrlToParent, false);
+              window.addEventListener('popstate', sendCurrentUrlToParent, false);
+              window.addEventListener('DOMContentLoaded', sendCurrentUrlToParent, false);
+          </script>
+
+        <div class="navbar navbar-default navbar-fixed-top d-md-none p-0">
+               <div class="d-flex">
+                    <a href="../" class="navbar-brand">Phoenix API Docs</a>
+                    <button type="button" class="btn btn-default btn-menu ion-ios-menu" id="btn-menu"></button>
+               </div>
         </div>
 
         <div class="xs-menu menu" id="mobile-menu">
@@ -23,7 +89,7 @@
 
         <div class="container-fluid main">
            <div class="row main">
-               <div class="hidden-xs menu">
+               <div class="d-none d-md-block menu">
                    <compodoc-menu mode="normal"></compodoc-menu>
                </div>
                <!-- START CONTENT -->
@@ -43,14 +109,20 @@
 
 
 
-                   
+
+
+
+
+
+
+
 
 <ol class="breadcrumb">
-  <li>Miscellaneous</li>
-  <li>Type aliases</li>
+  <li class="breadcrumb-item">Miscellaneous</li>
+  <li class="breadcrumb-item">Type aliases</li>
 </ol>
 
-<section>
+<section data-compodoc="block-index">
     <h3 id="index">Index</h3>
     <table class="table table-sm table-bordered index-table">
         <tbody>
@@ -58,7 +130,49 @@
                 <td class="col-md-4">
                     <ul class="index-list">
                         <li>
-                            <a href="#PhoenixMenuConfig" title="src/ui/phoenix-menu/phoenix-menu-node.ts"><b>PhoenixMenuConfig</b>&nbsp;&nbsp;&nbsp;(src/.../phoenix-menu-node.ts)</a>
+                            <a href="#CallbackFunction" title="src/helpers/active-variable.ts" ><b>CallbackFunction</b>&nbsp;&nbsp;&nbsp;(src/.../active-variable.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ColorByOption" title="src/managers/ui-manager/color-options.ts" ><b>ColorByOption</b>&nbsp;&nbsp;&nbsp;(src/.../color-options.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigButton" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigButton</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigCheckbox" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigCheckbox</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigColor" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigColor</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigColorBySelect" title="src/managers/ui-manager/color-options.ts" ><b>ConfigColorBySelect</b>&nbsp;&nbsp;&nbsp;(src/.../color-options.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigLabel" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigLabel</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigRangeSlider" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigRangeSlider</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigSelect" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigSelect</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ConfigSlider" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>ConfigSlider</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#ESDConverter" title="src/loaders/atlasesd-loader.ts" ><b>ESDConverter</b>&nbsp;&nbsp;&nbsp;(src/.../atlasesd-loader.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#PhoenixMenuConfigs" title="src/managers/ui-manager/phoenix-menu/config-types.ts" ><b>PhoenixMenuConfigs</b>&nbsp;&nbsp;&nbsp;(src/.../config-types.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#PlaybackSpeed" title="src/managers/session-manager/session-player.ts" ><b>PlaybackSpeed</b>&nbsp;&nbsp;&nbsp;(src/.../session-player.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#SessionState" title="src/managers/session-manager/session-manager.ts" ><b>SessionState</b>&nbsp;&nbsp;&nbsp;(src/.../session-manager.ts)</a>
+                        </li>
+                        <li>
+                            <a href="#SkipUnit" title="src/loaders/atlasesd-loader.ts" ><b>SkipUnit</b>&nbsp;&nbsp;&nbsp;(src/.../atlasesd-loader.ts)</a>
                         </li>
                     </ul>
                 </td>
@@ -67,25 +181,347 @@
     </table>
 </section>
 
-    <h3>src/ui/phoenix-menu/phoenix-menu-node.ts</h3>
-    <section>
+    <h3>src/helpers/active-variable.ts</h3>
+    <section data-compodoc="block-typealias">
     <table class="table table-sm table-bordered">
         <tbody>
             <tr>
                 <td class="col-md-4">
-                    <a name="PhoenixMenuConfig"></a>
-                    <span class="name"><b>PhoenixMenuConfig</b><a href="#PhoenixMenuConfig"><span class="icon ion-ios-link"></span></a></span>
+                    <a name="CallbackFunction"></a>
+                    <span class="name "><b>CallbackFunction</b><a href="#CallbackFunction"><span class="icon ion-ios-link"></span></a></span>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-                    <div class="io-description"><p>Configuration types for PhoenixMenuNode.</p>
+                    <div class="io-description"><p>Callback function type.</p>
 </div>
                 </td>
             </tr>
             <tr>
                 <td class="col-md-4">
-                    <code>    <code>&quot;checkbox&quot; | &quot;slider&quot; | &quot;button&quot; | &quot;label&quot; | &quot;color&quot; | &quot;rangeSlider&quot;</code>
+                    <code>        <code><a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/function" target="_blank" >function</a></code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>    <h3>src/managers/ui-manager/color-options.ts</h3>
+    <section data-compodoc="block-typealias">
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ColorByOption"></a>
+                    <span class="name "><b>ColorByOption</b><a href="#ColorByOption"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for a single color by option.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>literal type</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigColorBySelect"></a>
+                    <span class="name "><b>ConfigColorBySelect</b><a href="#ConfigColorBySelect"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for the &quot;Color by&quot; select. It carries the seed of the random colors, so
+that the seed is saved and restored with the rest of the menu state - the
+seed has to be back in place before the select is applied, and every property
+of a config is restored before that config is applied.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>    <h3>src/managers/ui-manager/phoenix-menu/config-types.ts</h3>
+    <section data-compodoc="block-typealias">
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigButton"></a>
+                    <span class="name "><b>ConfigButton</b><a href="#ConfigButton"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;button&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigCheckbox"></a>
+                    <span class="name "><b>ConfigCheckbox</b><a href="#ConfigCheckbox"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;checkbox&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigColor"></a>
+                    <span class="name "><b>ConfigColor</b><a href="#ConfigColor"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;color&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigLabel"></a>
+                    <span class="name "><b>ConfigLabel</b><a href="#ConfigLabel"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;label&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>literal type</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigRangeSlider"></a>
+                    <span class="name "><b>ConfigRangeSlider</b><a href="#ConfigRangeSlider"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;rangeSlider&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigSelect"></a>
+                    <span class="name "><b>ConfigSelect</b><a href="#ConfigSelect"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;select&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ConfigSlider"></a>
+                    <span class="name "><b>ConfigSlider</b><a href="#ConfigSlider"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for Phoenix menu node &quot;slider&quot; config.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>unknown</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="PhoenixMenuConfigs"></a>
+                    <span class="name "><b>PhoenixMenuConfigs</b><a href="#PhoenixMenuConfigs"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Type for all Phoenix menu mode configuration options.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>literal type</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>    <h3>src/loaders/atlasesd-loader.ts</h3>
+    <section data-compodoc="block-typealias">
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="ESDConverter"></a>
+                    <span class="name "><b>ESDConverter</b><a href="#ESDConverter"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Converter to run for a given aux container class family.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>&quot;tracks&quot; | &quot;trkTracks&quot; | &quot;particles&quot; | &quot;jets&quot; | &quot;clusters&quot; | &quot;vertices&quot; | &quot;met&quot;</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="SkipUnit"></a>
+                    <span class="name "><b>SkipUnit</b><a href="#SkipUnit"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>What a skip tally counts, so the summary can name the unit.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>&quot;object&quot; | &quot;event&quot; | &quot;collection&quot;</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>    <h3>src/managers/session-manager/session-player.ts</h3>
+    <section data-compodoc="block-typealias">
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="PlaybackSpeed"></a>
+                    <span class="name "><b>PlaybackSpeed</b><a href="#PlaybackSpeed"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Playback speed multipliers exposed to the UI.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>&quot;0.5&quot; | &quot;1&quot; | &quot;2&quot; | &quot;4&quot;</code>
+</code>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+</section>    <h3>src/managers/session-manager/session-manager.ts</h3>
+    <section data-compodoc="block-typealias">
+    <table class="table table-sm table-bordered">
+        <tbody>
+            <tr>
+                <td class="col-md-4">
+                    <a name="SessionState"></a>
+                    <span class="name "><b>SessionState</b><a href="#SessionState"><span class="icon ion-ios-link"></span></a></span>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <div class="io-description"><p>Discriminated union the <a href="SessionManager.state">SessionManager.state</a> observable carries.
+UI components subscribe to this to render the floating session pill.</p>
+</div>
+                </td>
+            </tr>
+            <tr>
+                <td class="col-md-4">
+                    <code>    <code>literal type | literal type | literal type | literal type | literal type | literal type | literal type | literal type</code>
 </code>
                 </td>
             </tr>
@@ -96,7 +532,7 @@
 
                    </div><div class="search-results">
     <div class="has-results">
-        <h1 class="search-results-title"><span class='search-results-count'></span> result-matching "<span class='search-query'></span>"</h1>
+        <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
         <ul class="search-results-list"></ul>
     </div>
     <div class="no-results">
@@ -108,6 +544,15 @@
            </div>
        </div>
 
+          <label class="dark-mode-switch">
+               <input type="checkbox">
+               <span class="slider">
+                    <svg class="slider-icon" viewBox="0 0 24 24" fill="none" height="20" stroke="#000" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" width="20" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"></path>
+                    </svg>
+               </span>
+          </label>
+
        <script>
             var COMPODOC_CURRENT_PAGE_DEPTH = 1;
             var COMPODOC_CURRENT_PAGE_CONTEXT = 'miscellaneous-typealiases';
@@ -115,18 +560,30 @@
             var MAX_SEARCH_RESULTS = 15;
        </script>
 
+       <script>
+               $darkModeToggleSwitchers = document.querySelectorAll('.dark-mode-switch input');
+               checkToggle(darkModeState);
+               if ($darkModeToggleSwitchers.length > 0) {
+                    for (var i = 0; i < $darkModeToggleSwitchers.length; i++) {
+                         $darkModeToggleSwitchers[i].addEventListener('change', function (event) {
+                              darkModeState = !darkModeState;
+                              toggleDarkMode(darkModeState);
+                         });
+                    }
+               }
+          </script>
+
        <script src="../js/libs/custom-elements.min.js"></script>
        <script src="../js/libs/lit-html.js"></script>
-       <!-- Required to polyfill modern browsers as code is ES5 for IE... -->
-       <script src="../js/libs/custom-elements-es5-adapter.js" charset="utf-8" defer></script>
+
        <script src="../js/menu-wc.js" defer></script>
+       <script nomodule src="../js/menu-wc_es5.js" defer></script>
 
        <script src="../js/libs/bootstrap-native.js"></script>
 
        <script src="../js/libs/es6-shim.min.js"></script>
        <script src="../js/libs/EventDispatcher.js"></script>
        <script src="../js/libs/promise.min.js"></script>
-       <script src="../js/libs/zepto.min.js"></script>
 
        <script src="../js/compodoc.js"></script>
 

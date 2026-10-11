@@ -2,7 +2,7 @@
 
 [![Version](https://img.shields.io/npm/v/phoenix-event-display.svg)](https://www.npmjs.com/package/phoenix-event-display)
 [![Downloads](https://img.shields.io/npm/dt/phoenix-event-display.svg)](https://www.npmjs.com/package/phoenix-event-display)
-[![Documentation Coverage](https://raw.github.com/HSF/phoenix/master/docs/api-docs/images/coverage-badge-documentation.svg)](https://hepsoftwarefoundation.org/phoenix/api-docs/coverage.html)
+[![Documentation Coverage](https://raw.github.com/HSF/phoenix/main/docs/api-docs/images/coverage-badge-documentation.svg)](https://hepsoftwarefoundation.org/phoenix/api-docs/coverage.html)
 
 A highly modular and API driven experiment independent event display that uses [three.js](https://threejs.org) for processing and presenting detector geometry and event data.
 
@@ -30,7 +30,7 @@ const eventDisplay = new EventDisplay();
 // Define the configuration
 const configuration = {
   elementId: '<wrapper_element_id>',
-  eventDataLoader: new PhoenixLoader() // or some other event data loader
+  eventDataLoader: new PhoenixLoader(), // or some other event data loader
   // ... other configuration options
 };
 
@@ -45,13 +45,16 @@ fetch('path/to/event-data.json')
   });
 
 // Load detector geometry
-eventDisplay.loadOBJGeometry('path/to/geometry.obj', 'Detector OBJ', 0x8c8c8c /* color */);
-
+eventDisplay.loadOBJGeometry(
+  'path/to/geometry.obj',
+  'Detector OBJ',
+  0x8c8c8c /* color */,
+);
 ```
 
 ### As a standalone bundle
 
-Phoenix can be bundled and used directly in the HTML as a script. You can either use the [CDN](https://cdn.jsdelivr.net/npm/phoenix-event-display/dist/bundle/phoenix.min.js) or build from source.
+Phoenix can be bundled and used directly in the HTML as a script along with [three.js](https://threejs.org). You can either use the [CDN](https://cdn.jsdelivr.net/npm/phoenix-event-display/dist/bundle/phoenix.min.js) or build from source.
 
 To build Phoenix as a bundle.
 
@@ -70,9 +73,9 @@ Without building, you can include the bundle directly from [CDN](https://cdn.jsd
   </head>
 
   <body>
-
     <div id="eventDisplay"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/three/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phoenix-event-display/dist/bundle/phoenix.min.js"></script>
 
     <script>
@@ -82,7 +85,7 @@ Without building, you can include the bundle directly from [CDN](https://cdn.jsd
       // Define the configuration
       const configuration = {
         elementId: 'eventDisplay',
-        eventDataLoader: new PhoenixLoader() // or some other event data loader
+        eventDataLoader: new PhoenixLoader(), // or some other event data loader
         // ... other configuration options
       };
 
@@ -91,12 +94,46 @@ Without building, you can include the bundle directly from [CDN](https://cdn.jsd
 
       // ... other event display functions
     </script>
-
   </body>
 </html>
 ```
 
 ### Examples
 
-* [Usage in Angular (as a service)](https://github.com/HSF/phoenix/blob/master/packages/phoenix-ng/projects/phoenix-app/src/app/sections/lhcb/lhcb.component.ts)
-* [Usage in React](https://github.com/9inpachi/phoenix-react/blob/master/src/App.js#L6-L31)
+- [Usage in Angular (as a service)](https://github.com/HSF/phoenix/blob/main/packages/phoenix-ng/projects/phoenix-app/src/app/sections/lhcb/lhcb.component.ts)
+- [Usage in React](https://github.com/9inpachi/phoenix-react/blob/main/src/App.js#L6-L31)
+
+## Event Data Loaders
+
+Phoenix supports multiple event data formats through specialized loader classes.
+
+### PHYSLITELoader
+
+`PHYSLITELoader` parses ATLAS DAOD_PHYSLITE `.root` files directly in the browser using [JSROOT](https://root.cern/js/). It reads calibrated physics objects from the ROOT `CollectionTree` branch and converts them into Phoenix event format.
+
+#### Supported Collections
+
+- **Jets**: Calibrated jet momentum and energy.
+- **Tracks**: InDetTrackParticles, MuonSpectrometerTrackParticles, CombinedMuonTrackParticles, GSFTrackParticles.
+- **Electrons & Muons**: Four-momentum ($p_T, \eta, \phi, m$).
+- **Photons**: Energy clusters and trajectories.
+- **Missing Energy (MET)**: `AnalysisMET` transverse energy vector ($E_{Tx}, E_{Ty}$).
+- **Primary Vertices & Calorimeter Clusters**.
+
+#### Usage Example
+
+```js
+import { EventDisplay, PHYSLITELoader } from 'phoenix-event-display';
+
+const eventDisplay = new EventDisplay();
+const physliteLoader = new PHYSLITELoader();
+
+// Load ROOT file buffer
+fetch('path/to/DAOD_PHYSLITE.root')
+  .then((res) => res.arrayBuffer())
+  .then((buffer) => {
+    physliteLoader.loadEvents(buffer, (events) => {
+      eventDisplay.parsePhoenixEvents(events);
+    });
+  });
+```
